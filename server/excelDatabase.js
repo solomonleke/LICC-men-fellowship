@@ -22,6 +22,26 @@ export const normalizePhone = (phone) => {
   return cleaned;
 };
 
+// ----------------- KNOWN SEEDED DUMMY RECORDS -----------------
+// Exact matches only. Never use broad substrings (e.g. "test") here,
+// otherwise genuine records get hidden or deleted.
+const DUMMY_MEMBER_IDS = new Set(['MEM-1001', 'MEM-1002', 'MEM-1003', 'MEM-1004', 'MEM-1005']);
+const DUMMY_MEMBER_NAMES = new Set(['emmanuel adeyemi', 'david okonkwo']);
+const DUMMY_SHOWCASE_IDS = new Set(['POST-5001']);
+const DUMMY_SHOWCASE_AUTHORS = new Set(['emmanuel adeyemi', 'david okonkwo']);
+
+export function isDummyMember(m) {
+  const id = String(m?.id || '').trim();
+  const fullName = `${String(m?.firstName || '').trim()} ${String(m?.lastName || '').trim()}`.toLowerCase();
+  return DUMMY_MEMBER_IDS.has(id) || DUMMY_MEMBER_NAMES.has(fullName);
+}
+
+export function isDummyShowcase(p) {
+  const id = String(p?.id || '').trim();
+  const author = String(p?.authorName || '').trim().toLowerCase();
+  return DUMMY_SHOWCASE_IDS.has(id) || DUMMY_SHOWCASE_AUTHORS.has(author);
+}
+
 const COLUMN_POSITIONS = {
   Members: {
     id: 1,
@@ -208,22 +228,15 @@ export async function getWorkbook() {
     sChanged = true;
   }
 
-  // Purge any dummy members so Member Directory has zero dummy records
+  // Purge known seeded dummy members (exact matches only — never real records)
   const dummyMembers = [];
   membersSheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
-    const id = String(getVal(row, membersSheet, 'id') || '').trim();
-    const firstName = String(getVal(row, membersSheet, 'firstName') || '').trim();
-    const lastName = String(getVal(row, membersSheet, 'lastName') || '').trim();
-    const fullName = `${firstName} ${lastName}`.toLowerCase();
-    if (
-      id.startsWith('MEM-100') ||
-      fullName.includes('emmanuel adeyemi') ||
-      fullName.includes('david okonkwo') ||
-      fullName.includes('test') ||
-      fullName.includes('dummy') ||
-      fullName.includes('sample')
-    ) {
+    if (isDummyMember({
+      id: getVal(row, membersSheet, 'id'),
+      firstName: getVal(row, membersSheet, 'firstName'),
+      lastName: getVal(row, membersSheet, 'lastName')
+    })) {
       dummyMembers.push(rowNumber);
     }
   });
@@ -232,23 +245,16 @@ export async function getWorkbook() {
     sChanged = true;
   }
 
-  // Purge any dummy showcase posts
+  // Purge known seeded dummy showcase posts (exact matches only)
   const dummyShowcases = [];
   showcasesSheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
-    const title = String(getVal(row, showcasesSheet, 'title') || '').toLowerCase();
-    const id = String(getVal(row, showcasesSheet, 'id') || '');
-    const author = String(getVal(row, showcasesSheet, 'authorName') || '').toLowerCase();
-    if (
-      id === 'POST-5001' ||
-      title.includes('leke tech') ||
-      title.includes('apex engineering') ||
-      title.includes('test') ||
-      title.includes('dummy') ||
-      author.includes('david okonkwo') ||
-      author.includes('emmanuel adeyemi') ||
-      !title
-    ) {
+    const title = String(getVal(row, showcasesSheet, 'title') || '').trim();
+    if (!title || isDummyShowcase({
+      id: getVal(row, showcasesSheet, 'id'),
+      title,
+      authorName: getVal(row, showcasesSheet, 'authorName')
+    })) {
       dummyShowcases.push(rowNumber);
     }
   });
@@ -413,17 +419,7 @@ export async function getAllMembers() {
       if (!firstName && !lastName && !whatsappPhone) return;
       if (firstName.toUpperCase() === 'N/A' && lastName.toUpperCase() === 'N/A') return;
 
-      const fullName = `${firstName} ${lastName}`.toLowerCase();
-      if (
-        id.startsWith('MEM-100') ||
-        fullName.includes('emmanuel adeyemi') ||
-        fullName.includes('david okonkwo') ||
-        fullName.includes('test') ||
-        fullName.includes('dummy') ||
-        fullName.includes('sample')
-      ) {
-        return;
-      }
+      if (isDummyMember({ id, firstName, lastName })) return;
 
       members.push({
         id: id || `MEM-${rowNumber}`,
@@ -517,12 +513,8 @@ export async function getAllShowcases() {
       const postId = String(getVal(row, showcasesSheet, 'id') || '');
       const title = String(getVal(row, showcasesSheet, 'title') || '').trim();
       const authorName = String(getVal(row, showcasesSheet, 'authorName') || '').trim();
-      const titleLower = title.toLowerCase();
-      const authorLower = authorName.toLowerCase();
 
-      if (postId === 'POST-5001' || !title) return;
-      if (titleLower.includes('apex engineering') || titleLower.includes('leke tech') || titleLower.includes('test') || titleLower.includes('dummy')) return;
-      if (authorLower.includes('david okonkwo') || authorLower.includes('emmanuel adeyemi') || authorLower.includes('test')) return;
+      if (!title || isDummyShowcase({ id: postId, title, authorName })) return;
 
       posts.push({
         id: postId,

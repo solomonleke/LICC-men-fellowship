@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar, AppTab } from './components/Sidebar';
 import { QuickStats } from './components/QuickStats';
 import { MemberDirectory } from './components/MemberDirectory';
@@ -11,6 +11,7 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { Member, ShowcasePost, ExcelStats } from './types';
 import { fetchMembers, deleteMember, fetchShowcases, fetchExcelStats } from './services/api';
 import { useAdmin } from './context/AdminContext';
+import { isValidMember, isValidShowcase } from './utils/dummyData';
 import { RefreshCw, UserPlus, ShieldCheck, CheckCircle2, X } from 'lucide-react';
 
 export function App() {
@@ -22,14 +23,34 @@ export function App() {
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('synced');
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date>(new Date());
+  const [timeAgoText, setTimeAgoText] = useState<string>('Just now');
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const isFetchingRef = useRef<boolean>(false);
+
   const [error, setError] = useState<string | null>(null);
   const [toastNotice, setToastNotice] = useState<string | null>(null);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
-  const loadData = async (isManual = false) => {
+  const loadData = useCallback(async (mode: 'initial' | 'manual' | 'background' = 'background') => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
+    if (mode === 'initial') {
+      setLoading(true);
+    } else if (mode === 'manual') {
+      setRefreshing(true);
+      setSyncStatus('syncing');
+    } else {
+      setSyncStatus('syncing');
+    }
+
+    const minDelay = mode === 'manual' ? 500 : 0;
+    const startTime = Date.now();
+
     try {
-      if (isManual) setRefreshing(true);
-      setError(null);
+      if (mode !== 'background') setError(null);
       const [membersData, showcasesData, statsData] = await Promise.all([
         fetchMembers().catch((err) => {
           console.warn('Members fetch error:', err);
@@ -44,21 +65,113 @@ export function App() {
           return null;
         }),
       ]);
+
       setMembers(membersData);
       setShowcases(showcasesData);
       setExcelStats(statsData);
+      setLastSyncedAt(new Date());
+      setSyncStatus(navigator.onLine ? 'synced' : 'offline');
+
+      if (mode === 'manual') {
+        setToastNotice('Fellowship records synchronized successfully.');
+        setTimeout(() => setToastNotice(null), 3000);
+      }
     } catch (err: any) {
       console.error('Failed to load data:', err);
-      setError('Could not connect to Excel Backend API server. Please make sure `npm run dev` or the server is running.');
+      if (mode !== 'background') {
+        setError('Could not connect to Excel Backend API server. Please make sure `npm run dev` or the server is running.');
+      }
+      setSyncStatus('offline');
     } finally {
+      const elapsed = Date.now() - startTime;
+      if (elapsed < minDelay) {
+        await new Promise((r) => setTimeout(r, minDelay - elapsed));
+      }
       setLoading(false);
-      if (isManual) setRefreshing(false);
+      setRefreshing(false);
+      isFetchingRef.current = false;
     }
-  };
-
-  useEffect(() => {
-    loadData();
   }, []);
+
+  // 1. Initial Load on Mount
+  useEffect(() => {
+    loadData('initial');
+  }, [loadData]);
+
+  // 2. Silent Refresh on Tab Switch
+  useEffect(() => {
+    loadData('background');
+  }, [activeTab, loadData]);
+
+  // 3. Periodic Background Auto-Sync (Every 25 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        loadData('background');
+      }
+    }, 25000);
+    return () => clearInterval(interval);
+  }, [loadData]);
+
+  // 4. Window Visibility & Focus Auto-Sync
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        const diff = Date.now() - lastSyncedAt.getTime();
+        if (diff > 12000) {
+          loadData('background');
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [lastSyncedAt, loadData]);
+
+  // 5. Online / Offline Network Listeners
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setSyncStatus('syncing');
+      setToastNotice('Connection restored! Synchronizing records...');
+      setTimeout(() => setToastNotice(null), 4000);
+      loadData('manual');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      setSyncStatus('offline');
+      setToastNotice('You are offline. Showing cached local fellowship records.');
+      setTimeout(() => setToastNotice(null), 5000);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [loadData]);
+
+  // 6. Live "Time Ago" Counter
+  useEffect(() => {
+    const updateTimeAgo = () => {
+      const sec = Math.floor((Date.now() - lastSyncedAt.getTime()) / 1000);
+      if (sec < 10) setTimeAgoText('Just now');
+      else if (sec < 60) setTimeAgoText(`${sec}s ago`);
+      else {
+        const min = Math.floor(sec / 60);
+        if (min < 60) setTimeAgoText(`${min}m ago`);
+        else setTimeAgoText(`${Math.floor(min / 60)}h ago`);
+      }
+    };
+    updateTimeAgo();
+    const ticker = setInterval(updateTimeAgo, 3000);
+    return () => clearInterval(ticker);
+  }, [lastSyncedAt]);
 
   const handleMemberAdded = (newMember: Member) => {
     setMembers([newMember, ...members]);
@@ -114,27 +227,8 @@ export function App() {
 
   const pageInfo = getPageTitle();
 
-  const validMembers = members.filter(m => {
-    const fName = (m.firstName || '').trim();
-    const lName = (m.lastName || '').trim();
-    const phone = (m.whatsappPhone || '').trim();
-    const id = (m.id || '').trim();
-    const fullName = `${fName} ${lName}`.toLowerCase();
-    if (!fName && !lName && !phone) return false;
-    if (fName.toUpperCase() === 'N/A' && lName.toUpperCase() === 'N/A') return false;
-    if (id.startsWith('MEM-100')) return false;
-    if (fullName.includes('emmanuel adeyemi') || fullName.includes('david okonkwo') || fullName.includes('test') || fullName.includes('dummy')) return false;
-    return true;
-  });
-
-  const validShowcases = showcases.filter(s => {
-    if (!s.title || !s.title.trim() || !s.authorName || !s.authorName.trim()) return false;
-    const title = s.title.toLowerCase();
-    const author = s.authorName.toLowerCase();
-    if (s.id === 'POST-5001' || title.includes('leke tech') || title.includes('apex engineering') || title.includes('test') || title.includes('dummy')) return false;
-    if (author.includes('david okonkwo') || author.includes('emmanuel adeyemi')) return false;
-    return true;
-  });
+  const validMembers = members.filter(isValidMember);
+  const validShowcases = showcases.filter(isValidShowcase);
 
   return (
     <div className="app-layout">
@@ -217,15 +311,41 @@ export function App() {
               </button>
             )}
 
+            {/* Live Background Sync Indicator Pill */}
             <button
-              onClick={() => loadData(true)}
-              className="btn-secondary"
-              title="Refresh Fellowship Records"
-              style={{ padding: '9px 14px', fontSize: '0.85rem' }}
+              onClick={() => loadData('manual')}
+              className="live-sync-pill"
+              title={`Last synchronized: ${lastSyncedAt.toLocaleTimeString()}. Click to sync now.`}
               disabled={refreshing}
             >
-              <RefreshCw size={15} className={refreshing ? 'spin' : ''} />
-              <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+              {syncStatus === 'offline' || !isOnline ? (
+                <>
+                  <span className="pulse-dot-offline" />
+                  <span>Offline Mode</span>
+                </>
+              ) : syncStatus === 'syncing' ? (
+                <>
+                  <span className="pulse-dot-syncing" />
+                  <span>Syncing...</span>
+                </>
+              ) : (
+                <>
+                  <span className="pulse-dot" />
+                  <span>Live Sync • {timeAgoText}</span>
+                </>
+              )}
+            </button>
+
+            {/* Manual Refresh Button */}
+            <button
+              onClick={() => loadData('manual')}
+              className="btn-secondary"
+              title={`Refresh Fellowship Records (Last: ${lastSyncedAt.toLocaleTimeString()})`}
+              style={{ padding: '8px 14px', fontSize: '0.84rem', gap: '6px' }}
+              disabled={refreshing}
+            >
+              <RefreshCw size={14} className={refreshing ? 'spin' : ''} />
+              <span>{refreshing ? 'Syncing...' : 'Refresh'}</span>
             </button>
 
             <button

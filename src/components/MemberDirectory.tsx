@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Search, Filter, MessageSquare, Briefcase, Trash2, ShieldCheck, UserPlus, Table, Grid } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Filter, MessageSquare, Briefcase, Trash2, ShieldCheck, UserPlus, Table, Grid, Users } from 'lucide-react';
 import { Member, AgeGroup, OCCUPATIONS } from '../types';
 import { useAdmin } from '../context/AdminContext';
+import { isValidMember } from '../utils/dummyData';
 
 interface MemberDirectoryProps {
   members: Member[];
@@ -24,18 +25,7 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
   // Strictly filter out any empty, placeholder, or corrupt rows
-  const validMembers = members.filter((m) => {
-    const fName = (m.firstName || '').trim();
-    const lName = (m.lastName || '').trim();
-    const phone = (m.whatsappPhone || '').trim();
-    const id = (m.id || '').trim();
-    const fullName = `${fName} ${lName}`.toLowerCase();
-    if (!fName && !lName && !phone) return false;
-    if (fName.toUpperCase() === 'N/A' && lName.toUpperCase() === 'N/A') return false;
-    if (id.startsWith('MEM-100')) return false;
-    if (fullName.includes('emmanuel adeyemi') || fullName.includes('david okonkwo') || fullName.includes('test') || fullName.includes('dummy')) return false;
-    return true;
-  });
+  const validMembers = members.filter(isValidMember);
 
   const filteredMembers = validMembers.filter((m) => {
     const matchesSearch =

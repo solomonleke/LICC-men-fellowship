@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, MapPin, Tag, FileText, Image as ImageIcon, X, AlertCircle, PlusCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Calendar, X, AlertCircle, PlusCircle } from 'lucide-react';
 import { FellowshipEvent } from '../types';
 import { createEvent } from '../services/api';
 import { useAdmin } from '../context/AdminContext';
@@ -12,21 +12,19 @@ interface EventFormModalProps {
 
 const DEFAULT_VENUE = 'Light Cathedral, By Old Airport Bus-Stop, U.I Road, Samonda, Ibadan.';
 
-const EVENT_CATEGORIES = [
+const EVENT_CATEGORIES: FellowshipEvent['category'][] = [
   'Monthly Meeting',
-  'Breakfast Fellowship',
-  'Prayer & Word Vigil',
-  'Business & Career Seminar',
-  'Family & Marriage Outreach',
-  'Men Retreat',
-  'Health & Fitness Day',
-  'Community Evangelism'
+  'Business Seminar',
+  'Prayer Vigil',
+  'Breakfast & Word',
+  'Outreach',
+  'Special Event'
 ];
 
 export function EventFormModal({ isOpen, onClose, onEventCreated }: EventFormModalProps) {
   const { adminUser, passcode } = useAdmin();
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('Monthly Meeting');
+  const [category, setCategory] = useState<FellowshipEvent['category']>('Monthly Meeting');
   const [eventDate, setEventDate] = useState('');
   const [eventTime, setEventTime] = useState('8:00 AM - 10:30 AM');
   const [venue, setVenue] = useState(DEFAULT_VENUE);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   Users, 
   Store, 
@@ -12,9 +12,7 @@ import {
   Menu, 
   X,
   ShieldCheck,
-  Award,
-  KeyRound,
-  Lock
+  KeyRound
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAdmin } from '../context/AdminContext';

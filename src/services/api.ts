@@ -1,4 +1,4 @@
-import { Member, ShowcasePost, ShowcaseComment, BackendStats, ExcoMember, FellowshipEvent, AdminSession } from '../types';
+import { Member, ShowcasePost, ShowcaseComment, BackendStats, ExcoMember, FellowshipEvent } from '../types';
 
 const API_BASE = '/api';
 
@@ -102,6 +102,7 @@ export async function fetchExcelStats(): Promise<BackendStats> {
       totalShowcases: 0,
       totalComments: 0,
       source: 'Local Cache',
+      lastModified: new Date().toISOString(),
       isGoogleSheets: false,
       ageGroupBreakdown: {
         '18-29': 0,

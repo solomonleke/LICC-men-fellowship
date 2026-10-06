@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Store, PlusCircle, Heart, MessageSquare, ExternalLink, Search, CheckCircle2, X } from 'lucide-react';
 import { ShowcasePost, Member } from '../types';
+import { isValidShowcase } from '../utils/dummyData';
 import { likeShowcasePost } from '../services/api';
 import { PostDetailModal } from './PostDetailModal';
 import { ShowcaseFormModal } from './ShowcaseFormModal';
@@ -18,14 +19,7 @@ export const BusinessShowcase: React.FC<BusinessShowcaseProps> = ({ showcases, m
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
-  const validShowcases = showcases.filter(s => {
-    if (!s.title || !s.title.trim() || !s.authorName || !s.authorName.trim()) return false;
-    const title = s.title.toLowerCase();
-    const author = s.authorName.toLowerCase();
-    if (s.id === 'POST-5001' || title.includes('leke tech') || title.includes('apex engineering') || title.includes('test') || title.includes('dummy')) return false;
-    if (author.includes('david okonkwo') || author.includes('emmanuel adeyemi')) return false;
-    return true;
-  });
+  const validShowcases = showcases.filter(isValidShowcase);
 
   const filteredShowcases = validShowcases.filter(s =>
     s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||

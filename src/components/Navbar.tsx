@@ -1,5 +1,4 @@
-import React from 'react';
-import { Users, Store, FileSpreadsheet, UserPlus, Sun, Moon, Monitor } from 'lucide-react';
+import { Users, Store, UserPlus, Sun, Moon, Monitor } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 interface NavbarProps {

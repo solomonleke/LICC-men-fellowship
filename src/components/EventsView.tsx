@@ -1,17 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Calendar,
   Clock,
   MapPin,
   Plus,
   Trash2,
-  Share2,
   CalendarDays,
-  ShieldCheck,
   AlertCircle,
-  ExternalLink,
   MessageCircle,
-  CheckCircle2,
   KeyRound
 } from 'lucide-react';
 import { FellowshipEvent } from '../types';
@@ -20,7 +16,7 @@ import { useAdmin } from '../context/AdminContext';
 import { EventFormModal } from './EventFormModal';
 
 export function EventsView() {
-  const { isAdmin, adminUser, passcode, openLoginModal } = useAdmin();
+  const { isAdmin, passcode, openLoginModal } = useAdmin();
   const [events, setEvents] = useState<FellowshipEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');

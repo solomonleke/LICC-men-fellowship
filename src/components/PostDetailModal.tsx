@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, MessageSquare, Send, Heart, User, Clock, Loader2 } from 'lucide-react';
 import { ShowcasePost, ShowcaseComment } from '../types';

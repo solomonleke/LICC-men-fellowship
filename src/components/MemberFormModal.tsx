@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle, AlertTriangle, AlertCircle, ShieldCheck, Loader2, ChevronDown, Search, Check } from 'lucide-react';
 import { AgeGroup, Member, OCCUPATIONS } from '../types';
 import { checkPhoneUniqueness, createMember } from '../services/api';

@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import { INITIAL_EXCOS } from './excelDatabase.js';
+import { INITIAL_EXCOS, isDummyMember, isDummyShowcase } from './excelDatabase.js';
 
 let config = {
   url: process.env.GOOGLE_SHEETS_URL || '',
@@ -94,8 +94,7 @@ export async function getMembersFromSheet() {
       const fullName = `${fName} ${lName}`.toLowerCase();
       if (!fName && !lName && !phone) return false;
       if (fName.toUpperCase() === 'N/A' && lName.toUpperCase() === 'N/A') return false;
-      if (id.startsWith('MEM-100')) return false;
-      if (fullName.includes('emmanuel adeyemi') || fullName.includes('david okonkwo') || fullName.includes('test') || fullName.includes('dummy')) return false;
+      if (isDummyMember(m)) return false;
       return true;
     })
     .reverse();
@@ -162,14 +161,7 @@ export async function getShowcasesFromSheet() {
     });
 
     return (showcases || [])
-      .filter(p => {
-        const title = String(p.title || '').trim().toLowerCase();
-        const author = String(p.authorName || '').trim().toLowerCase();
-        if (p.id === 'POST-5001') return false;
-        if (title.includes('leke tech') || title.includes('apex engineering') || title.includes('test')) return false;
-        if (author.includes('david okonkwo') || author.includes('emmanuel adeyemi') || author.includes('test')) return false;
-        return p.title && p.authorName;
-      })
+      .filter(p => p.title && p.authorName && !isDummyShowcase(p))
       .map(p => ({
         ...p,
         likes: Number(p.likes || 0),
@@ -280,10 +272,8 @@ export async function getStatsFromSheet() {
     }
   });
 
-  const validShowcases = (showcases || []).filter(s => 
-    s.id !== 'POST-5001' && 
-    !String(s.title || '').includes('Leke Tech') && 
-    s.title && s.authorName
+  const validShowcases = (showcases || []).filter(s =>
+    s.title && s.authorName && !isDummyShowcase(s)
   );
 
   return {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Lock, KeyRound, AlertCircle, CheckCircle, UserCheck, LogOut, X, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ShieldCheck, Lock, KeyRound, AlertCircle, CheckCircle, LogOut, X, Eye, EyeOff } from 'lucide-react';
 import { useAdmin } from '../context/AdminContext';
 import { fetchExcos } from '../services/api';
 import { ExcoMember } from '../types';

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Shield, Award, Phone, Mail, CheckCircle2, UserCheck, KeyRound, ExternalLink, MessageCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Shield, Award, Phone, CheckCircle2, UserCheck, KeyRound, MessageCircle } from 'lucide-react';
 import { ExcoMember } from '../types';
 import { fetchExcos } from '../services/api';
 import { useAdmin } from '../context/AdminContext';

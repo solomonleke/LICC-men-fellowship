@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { ExcoMember } from '../types';
 import { adminLogin } from '../services/api';
 
@@ -17,7 +17,7 @@ const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'licc_exco_admin_auth';
 
-export function AdminProvider({ children }: { children: React.ReactNode }) {
+export function AdminProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [adminUser, setAdminUser] = useState<ExcoMember | null>(null);
   const [passcode, setPasscode] = useState<string>('');

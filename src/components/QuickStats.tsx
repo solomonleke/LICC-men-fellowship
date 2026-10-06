@@ -1,4 +1,3 @@
-import React from 'react';
 import { Users, PhoneCall, Store } from 'lucide-react';
 import { ExcelStats } from '../types';
 
