@@ -1,0 +1,35 @@
+{
+  "name": "licc-men-fellowship",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "LICC Men Fellowship Portal with Excel Database Engine",
+  "scripts": {
+    "dev": "concurrently \"node --watch server/server.js\" \"vite\"",
+    "client": "vite",
+    "server": "node --watch server/server.js",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "excel:export": "node scripts/excel_manager.js export",
+    "excel:validate": "node scripts/excel_manager.js validate"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^18.0.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "lucide-react": "^0.475.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "nodemon": "^3.1.9",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.1"
+  }
+}
