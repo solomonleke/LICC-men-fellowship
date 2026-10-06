@@ -214,7 +214,7 @@ export function EventFormModal({ isOpen, onClose, onEventCreated }: EventFormMod
               <label className="input-label">Category</label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => setCategory(e.target.value as FellowshipEvent['category'])}
                 className="input-field"
                 style={{ cursor: 'pointer' }}
               >
