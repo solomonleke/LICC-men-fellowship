@@ -63,7 +63,7 @@ export function EventsView() {
   };
 
   const handleShareWhatsApp = (evt: FellowshipEvent) => {
-    const text = `*LICC Men Fellowship Event*\n\n📌 *${evt.title}*\n🗓️ Date: ${evt.eventDate}\n⏰ Time: ${evt.eventTime}\n📍 Venue: ${evt.venue}\n\n${evt.description ? `${evt.description}\n\n` : ''}_Light International Christian Center (LICC) - Men Fellowship_`;
+    const text = `*LICC Men's Fellowship Event*\n\n📌 *${evt.title}*\n🗓️ Date: ${evt.eventDate}\n⏰ Time: ${evt.eventTime}\n📍 Venue: ${evt.venue}\n\n${evt.description ? `${evt.description}\n\n` : ''}_Light International Christian Center (LICC) - Men Fellowship_`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };

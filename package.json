@@ -2,7 +2,7 @@
   "name": "licc-men-fellowship",
   "version": "1.0.0",
   "type": "module",
-  "description": "LICC Men Fellowship Portal with Excel Database Engine",
+  "description": "LICC Men's Fellowship Portal with Excel Database Engine",
   "scripts": {
     "dev": "concurrently \"node --watch server/server.js\" \"vite\"",
     "client": "vite",

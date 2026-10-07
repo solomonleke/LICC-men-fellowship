@@ -67,10 +67,39 @@ export const BusinessShowcase: React.FC<BusinessShowcaseProps> = ({ showcases, m
           </p>
         </div>
 
-        <button onClick={() => setIsModalOpen(true)} className="btn-primary">
-          <PlusCircle size={18} />
-          Create Showcase Post
-        </button>
+        <div style={{ display: 'inline-block', cursor: 'not-allowed' }} title="Showcase submissions will open soon!">
+          <button
+            disabled
+            className="btn-primary"
+            style={{
+              opacity: 0.72,
+              cursor: 'not-allowed',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              pointerEvents: 'none'
+            }}
+          >
+            <PlusCircle size={18} />
+            <span>Create Showcase Post</span>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                background: 'rgba(245, 158, 11, 0.25)',
+                color: '#fbbf24',
+                border: '1px solid rgba(245, 158, 11, 0.5)',
+                padding: '2px 8px',
+                borderRadius: '9999px',
+                marginLeft: '4px'
+              }}
+            >
+              Coming Soon
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Success Notification Banner */}

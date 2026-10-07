@@ -1,8 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, CheckCircle, AlertTriangle, AlertCircle, ShieldCheck, Loader2, ChevronDown, Search, Check } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, AlertCircle, ShieldCheck, Loader2, ChevronDown, Search, Check, Cake } from 'lucide-react';
 import { AgeGroup, Member, OCCUPATIONS } from '../types';
 import { checkPhoneUniqueness, createMember } from '../services/api';
 import { validatePhoneNumber } from '../utils/phoneValidation';
+
+const DOB_MONTHS = [
+  { value: 'Jan', label: 'January' },
+  { value: 'Feb', label: 'February' },
+  { value: 'Mar', label: 'March' },
+  { value: 'Apr', label: 'April' },
+  { value: 'May', label: 'May' },
+  { value: 'Jun', label: 'June' },
+  { value: 'Jul', label: 'July' },
+  { value: 'Aug', label: 'August' },
+  { value: 'Sep', label: 'September' },
+  { value: 'Oct', label: 'October' },
+  { value: 'Nov', label: 'November' },
+  { value: 'Dec', label: 'December' },
+];
+
+const DOB_DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
 
 interface MemberFormModalProps {
   isOpen: boolean;
@@ -21,6 +38,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
   const [ageGroup, setAgeGroup] = useState<AgeGroup>('30-39');
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [altPhone, setAltPhone] = useState('');
+  const [dobMonth, setDobMonth] = useState('');
+  const [dobDay, setDobDay] = useState('');
 
   const [phoneChecking, setPhoneChecking] = useState(false);
   const [isDuplicate, setIsDuplicate] = useState<boolean | null>(null);
@@ -88,8 +107,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalOccupation = occupation === 'Other' ? (customOccupation.trim() || 'Other') : occupation;
-    if (!firstName || !lastName || !finalOccupation || !whatsappPhone) {
-      setErrorMsg('Please fill in all mandatory fields.');
+    if (!firstName || !lastName || !finalOccupation || !whatsappPhone || !dobMonth || !dobDay) {
+      setErrorMsg('Please fill in all mandatory fields including Date of Birth (Month & Day).');
       return;
     }
 
@@ -117,6 +136,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
     setErrorMsg(null);
 
     try {
+      const dob = `${dobDay} ${dobMonth}`;
       const newMember = await createMember({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -124,6 +144,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
         ageGroup,
         whatsappPhone: val.normalized || whatsappPhone.trim(),
         altPhone: altPhone.trim() ? (validatePhoneNumber(altPhone).normalized || altPhone.trim()) : undefined,
+        dob,
+        dom: dob,
       });
 
       onMemberAdded(newMember);
@@ -146,6 +168,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
     setAgeGroup('30-39');
     setWhatsappPhone('');
     setAltPhone('');
+    setDobMonth('');
+    setDobDay('');
     setIsDuplicate(null);
     setErrorMsg(null);
   };
@@ -452,6 +476,54 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
             )}
           </div>
 
+          {/* Date of Birth (DOB) - Compulsory (Month & Day only) */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label className="input-label" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Cake size={14} color="var(--accent-gold)" />
+                Date of Birth (DOB) *
+              </label>
+              <span style={{ fontSize: '0.75rem', color: 'var(--accent-gold)', fontWeight: 700 }}>Compulsory</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px' }}>
+              <div>
+                <select
+                  className="input-field"
+                  value={dobMonth}
+                  onChange={(e) => {
+                    setDobMonth(e.target.value);
+                    if (!e.target.value) setDobDay('');
+                  }}
+                  style={{ cursor: 'pointer' }}
+                  required
+                >
+                  <option value="">Select Month *</option>
+                  {DOB_MONTHS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <select
+                  className="input-field"
+                  value={dobDay}
+                  onChange={(e) => setDobDay(e.target.value)}
+                  style={{ cursor: 'pointer' }}
+                  disabled={!dobMonth}
+                  required
+                >
+                  <option value="">Select Day *</option>
+                  {DOB_DAYS.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Month and day only (no birth year required) for fellowship birthday celebrations.
+            </p>
+          </div>
+
           {/* Actions */}
           <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
             <button type="button" onClick={onClose} className="btn-secondary" style={{ flex: 1 }}>
@@ -464,12 +536,14 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
                 isDuplicate === true ||
                 phoneChecking ||
                 !phoneValidation.isValid ||
-                (altPhone.trim().length > 0 && !altValidation.isValid)
+                (altPhone.trim().length > 0 && !altValidation.isValid) ||
+                !dobMonth ||
+                !dobDay
               }
               className="btn-primary"
               style={{
                 flex: 1,
-                opacity: (submitting || isDuplicate === true || phoneChecking || !phoneValidation.isValid || (altPhone.trim().length > 0 && !altValidation.isValid)) ? 0.6 : 1
+                opacity: (submitting || isDuplicate === true || phoneChecking || !phoneValidation.isValid || (altPhone.trim().length > 0 && !altValidation.isValid) || !dobMonth || !dobDay) ? 0.6 : 1
               }}
             >
               {submitting ? 'Saving to Excel...' : 'Save Member Record'}

@@ -74,8 +74,8 @@ function isGoogleSheetsActive() {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    message: 'LICC Men Fellowship API running',
-    activeBackend: isGoogleSheetsActive() ? 'Google Sheets (Live Cloud)' : 'Local Excel (.xlsx)'
+    message: "LICC Men's Fellowship API running",
+    activeBackend: isGoogleSheetsActive() ?'Google Sheets (Live Cloud)': 'Local Excel (.xlsx)'
   });
 });
 
@@ -216,9 +216,10 @@ app.get('/api/members/check-phone', async (req, res) => {
 
 app.post('/api/members', async (req, res) => {
   try {
-    const { firstName, lastName, occupation, ageGroup, whatsappPhone, altPhone } = req.body;
-    if (!firstName || !lastName || !occupation || !ageGroup || !whatsappPhone) {
-      return res.status(400).json({ error: 'Please provide all required fields (First Name, Last Name, Occupation, Age Group, WhatsApp Phone).' });
+    const { firstName, lastName, occupation, ageGroup, whatsappPhone, altPhone, dob, dom } = req.body;
+    const finalDob = String(dob || dom || '').trim();
+    if (!firstName || !lastName || !occupation || !ageGroup || !whatsappPhone || !finalDob) {
+      return res.status(400).json({ error: 'Please provide all required fields (First Name, Last Name, Occupation, Age Group, WhatsApp Phone, Date of Birth).' });
     }
 
     const phoneVal = validatePhone(whatsappPhone);
@@ -242,7 +243,9 @@ app.post('/api/members', async (req, res) => {
       occupation: occupation.trim(),
       ageGroup,
       whatsappPhone: finalPhone,
-      altPhone: finalAltPhone
+      altPhone: finalAltPhone,
+      dob: finalDob,
+      dom: finalDob
     };
 
     // Always persist to local Excel as guaranteed persistent storage
@@ -362,7 +365,7 @@ app.post('/api/showcases/:id/like', async (req, res) => {
     if (isGoogleSheetsActive()) {
       try {
         likes = await likeShowcaseInSheet(req.params.id);
-        try { await likeLocalShowcase(req.params.id); } catch (e) {}
+        try { await likeLocalShowcase(req.params.id); } catch (e) { }
       } catch (sheetErr) {
         console.warn('Google Sheets like failed, falling back to local Excel:', sheetErr.message);
         likes = await likeLocalShowcase(req.params.id);
@@ -519,7 +522,7 @@ app.post('/api/events', requireAdmin, async (req, res) => {
     let newEvent;
     if (isGoogleSheetsActive()) {
       newEvent = await addEventToSheet(eventPayload);
-      try { await addLocalEvent(eventPayload); } catch (e) {}
+      try { await addLocalEvent(eventPayload); } catch (e) { }
     } else {
       newEvent = await addLocalEvent(eventPayload);
     }
@@ -535,7 +538,7 @@ app.delete('/api/events/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     if (isGoogleSheetsActive()) {
       await deleteEventFromSheet(id);
-      try { await deleteLocalEvent(id); } catch (e) {}
+      try { await deleteLocalEvent(id); } catch (e) { }
       return res.json({ message: 'Event deleted successfully from Google Sheets' });
     }
     const success = await deleteLocalEvent(id);

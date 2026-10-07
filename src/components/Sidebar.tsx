@@ -101,7 +101,7 @@ export function Sidebar({
             style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'contain', background: '#fff' }} 
           />
           <div>
-            <h1 style={{ fontSize: '1rem', fontWeight: 800 }}>LICC MEN</h1>
+            <h1 style={{ fontSize: '1rem', fontWeight: 800 }}>LICC Men's</h1>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Fellowship Portal</span>
           </div>
         </div>
@@ -174,7 +174,7 @@ export function Sidebar({
             </div>
             <div>
               <h2 style={{ fontSize: '0.96rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                LICC MEN FELLOWSHIP
+                LICC Men's FELLOWSHIP
               </h2>
               <p style={{ fontSize: '0.72rem', color: 'var(--accent-teal)', fontWeight: 600, marginTop: '2px' }}>
                 Light Cathedral • Samonda, Ibadan
@@ -450,7 +450,7 @@ export function Sidebar({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.66rem', color: 'var(--text-muted)' }}>
-            <span>LICC Men Portal © 2026</span>
+            <span>LICC Men's Portal © 2026</span>
             <span>Light Cathedral</span>
           </div>
         </div>

@@ -234,7 +234,7 @@ export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats })
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
             <div style={{ background: 'var(--bg-surface-subtle)', padding: '14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)' }}>
               <strong style={{ color: 'var(--text-primary)' }}>Step 1: Create a Google Sheet</strong>
-              <p>Go to <a href="https://sheets.new" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-teal-bright)' }}>sheets.new</a> and name it <strong>LICC Men Fellowship Database</strong>.</p>
+              <p>Go to <a href="https://sheets.new" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-teal-bright)' }}>sheets.new</a> and name it <strong>LICC Men's Fellowship Database</strong>.</p>
             </div>
 
             <div style={{ background: 'var(--bg-surface-subtle)', padding: '14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)' }}>

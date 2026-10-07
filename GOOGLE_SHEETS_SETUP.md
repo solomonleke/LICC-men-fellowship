@@ -1,4 +1,4 @@
-# 📊 Google Sheets Setup Guide for LICC Men Fellowship
+# 📊 Google Sheets Setup Guide for LICC Men's Fellowship
 
 This guide will walk you through setting up your Google Sheet backend in **under 3 minutes**.
 
@@ -6,7 +6,7 @@ This guide will walk you through setting up your Google Sheet backend in **under
 
 ### Step 1: Create a New Google Sheet
 1. Go to [Google Sheets](https://sheets.new) in your browser.
-2. Name the sheet: **`LICC Men Fellowship Database`**.
+2. Name the sheet: **`LICC Men's Fellowship Database`**.
 
 ---
 

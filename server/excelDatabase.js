@@ -51,7 +51,9 @@ const COLUMN_POSITIONS = {
     agegroup: 5,
     whatsappphone: 6,
     altphone: 7,
-    createdat: 8
+    dob: 8,
+    dom: 8,
+    createdat: 9
   },
   Showcases: {
     id: 1,
@@ -194,6 +196,7 @@ export async function getWorkbook() {
     { header: 'Age Group', key: 'ageGroup', width: 16 },
     { header: 'WhatsApp Phone', key: 'whatsappPhone', width: 20 },
     { header: 'Alt Phone', key: 'altPhone', width: 20 },
+    { header: 'DOB', key: 'dob', width: 16 },
     { header: 'Created At', key: 'createdAt', width: 24 }
   ];
 
@@ -315,6 +318,7 @@ function createMembersSheet(workbook) {
     { header: 'Age Group', key: 'ageGroup', width: 16 },
     { header: 'WhatsApp Phone', key: 'whatsappPhone', width: 20 },
     { header: 'Alt Phone', key: 'altPhone', width: 20 },
+    { header: 'DOB', key: 'dob', width: 16 },
     { header: 'Created At', key: 'createdAt', width: 24 }
   ];
   styleHeaderRow(sheet);
@@ -433,6 +437,7 @@ export async function getAllMembers() {
       const ageGroup = String(getVal(row, sheet, 'ageGroup') || '').trim();
       const whatsappPhone = String(getVal(row, sheet, 'whatsappPhone') || '').trim();
       const altPhone = String(getVal(row, sheet, 'altPhone') || '').trim();
+      const dobVal = String(getVal(row, sheet, 'dob') || getVal(row, sheet, 'dom') || '').trim();
       const createdAt = String(getVal(row, sheet, 'createdAt') || '').trim();
 
       // Must have at least a first name, last name, or phone number to be considered a real record
@@ -449,6 +454,8 @@ export async function getAllMembers() {
         ageGroup,
         whatsappPhone,
         altPhone,
+        dob: dobVal,
+        dom: dobVal || undefined,
         createdAt
       });
     });
@@ -464,6 +471,11 @@ export async function addMember(data) {
   const normalizedPhone = normalizePhone(data.whatsappPhone);
   if (!normalizedPhone) {
     throw new Error('Primary WhatsApp Phone Number is required.');
+  }
+
+  const dobVal = String(data.dob || data.dom || '').trim();
+  if (!dobVal) {
+    throw new Error('Date of Birth (DOB) is compulsory.');
   }
 
   const phoneExists = await checkPhoneExists(normalizedPhone);
@@ -482,6 +494,8 @@ export async function addMember(data) {
     ageGroup: data.ageGroup,
     whatsappPhone: normalizedPhone,
     altPhone: data.altPhone ? normalizePhone(data.altPhone) : '',
+    dob: dobVal,
+    dom: dobVal,
     createdAt: new Date().toISOString()
   };
 

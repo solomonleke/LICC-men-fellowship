@@ -1,5 +1,5 @@
 /**
- * LICC Men Fellowship - Google Sheets backend (Google Apps Script web app)
+ * LICC Men's Fellowship - Google Sheets backend (Google Apps Script web app)
  *
  * Paste this whole file into your Google Sheet: Extensions > Apps Script.
  * Then follow GOOGLE_SHEETS_SETUP.md in the project root.
@@ -13,7 +13,7 @@ const API_TOKEN = 'licc-fellowship-2026-secret-key';
 
 // Tabs and column headers. Row 1 of each tab holds these exact header names.
 const SCHEMA = {
-  Members: ['id', 'firstName', 'lastName', 'occupation', 'ageGroup', 'whatsappPhone', 'altPhone', 'createdAt'],
+  Members: ['id', 'firstName', 'lastName', 'occupation', 'ageGroup', 'whatsappPhone', 'altPhone', 'dob', 'createdAt'],
   Showcases: ['id', 'authorPhone', 'authorName', 'title', 'category', 'description', 'imageUrl', 'whatsappContact', 'createdAt', 'likes'],
   Comments: ['id', 'postId', 'authorName', 'commentText', 'createdAt'],
   Events: ['id', 'title', 'category', 'eventDate', 'eventTime', 'venue', 'description', 'bannerUrl', 'createdBy', 'createdAt'],
@@ -47,7 +47,7 @@ function setup() {
 
 // Health check: open the web app URL in a browser to confirm it is deployed
 function doGet() {
-  return json({ ok: true, data: 'LICC Men Fellowship Sheets API is running' });
+  return json({ ok: true, data: "LICC Men's Fellowship Sheets API is running" });
 }
 
 function doPost(e) {
@@ -102,7 +102,11 @@ function handle(body) {
         if (exists) throw new Error('DUPLICATE');
       }
       const row = headers.map(function (h) {
-        return record[h] === undefined || record[h] === null ? '' : String(record[h]);
+        let val = record[h];
+        if (h === 'dob' && (val === undefined || val === null || val === '')) {
+          val = record['dom'];
+        }
+        return val === undefined || val === null ? '' : String(val);
       });
       const range = sheet.getRange(sheet.getLastRow() + 1, 1, 1, headers.length);
       range.setNumberFormat('@'); // plain text, so "+234..." is not turned into a number
@@ -156,6 +160,7 @@ function readAll(sheet, name) {
     .map(function (row, i) {
       const obj = { _row: i + 2 };
       headers.forEach(function (h, j) { obj[h] = row[j]; });
+      if (obj.dob) obj.dom = obj.dob;
       return obj;
     })
     .filter(function (obj) { return obj.id; }); // skip blank rows

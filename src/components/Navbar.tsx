@@ -43,7 +43,7 @@ export function Navbar({
           </div>
           <div>
             <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              LICC MEN FELLOWSHIP
+              LICC Men's FELLOWSHIP
             </h1>
             <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Member Contact Directory & Business Showcase Portal</p>
           </div>

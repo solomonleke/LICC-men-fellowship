@@ -14,8 +14,6 @@ async function runExcelManager() {
   const command = args[0] || 'validate';
 
   console.log('----------------------------------------------------');
-  console.log('📊 LICC Men Fellowship Excel Database Manager Utility');
-  console.log(`📁 File Target: ${EXCEL_FILE_PATH}`);
   console.log('----------------------------------------------------\n');
 
   const workbook = await getWorkbook();

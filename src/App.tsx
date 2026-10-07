@@ -223,7 +223,7 @@ export function App() {
           subtitle: 'Administrative data management, demographic reports & local backups'
         };
       default:
-        return { title: 'LICC Men Fellowship', subtitle: 'Portal' };
+        return { title: "LICC Men's Fellowship", subtitle: 'Portal' };
     }
   };
 
@@ -265,7 +265,7 @@ export function App() {
         }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>LICC Men Portal</span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>LICC Men's Portal</span>
               <span style={{ color: 'var(--text-muted)' }}>/</span>
               <span style={{ fontSize: '0.78rem', color: 'var(--accent-teal)', fontWeight: 700 }}>
                 {activeTab === 'directory' ? 'Directory' : activeTab === 'showcase' ? 'Showcase' : activeTab === 'events' ? 'Events' : activeTab === 'excos' ? 'EXCOs' : 'Settings'}
@@ -483,7 +483,7 @@ export function App() {
 
         {/* Footer */}
         <footer style={{ borderTop: '1px solid var(--glass-border)', padding: '18px 28px', textAlign: 'center', fontSize: '0.82rem', color: 'var(--text-muted)', background: 'var(--nav-pill-bg)', marginTop: 'auto' }}>
-          LICC Men Fellowship • Light Cathedral, By Old Airport Bus-Stop, U.I Road, Samonda, Ibadan.
+          LICC Men's Fellowship • Light Cathedral, By Old Airport Bus-Stop, U.I Road, Samonda, Ibadan.
         </footer>
 
       </div>

@@ -49,6 +49,8 @@ export interface Member {
   ageGroup: AgeGroup;
   whatsappPhone: string; // Primary phone number, format +234...
   altPhone?: string;     // Optional secondary phone number
+  dob: string;           // Date of Birth (Month & Day, e.g. "14 Oct") - Compulsory
+  dom?: string;          // Optional Date of Marriage legacy fallback
   createdAt: string;
 }
 

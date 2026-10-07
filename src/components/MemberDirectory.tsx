@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter, MessageSquare, Briefcase, Trash2, ShieldCheck, UserPlus, Table, Grid, Users } from 'lucide-react';
+import { Search, Filter, MessageSquare, Briefcase, Trash2, ShieldCheck, UserPlus, Table, Grid, Users, Cake } from 'lucide-react';
 import { Member, AgeGroup, OCCUPATIONS } from '../types';
 import { useAdmin } from '../context/AdminContext';
 import { isValidMember } from '../utils/dummyData';
@@ -30,7 +30,9 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
   const filteredMembers = validMembers.filter((m) => {
     const matchesSearch =
       `${m.firstName} ${m.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (m.occupation && m.occupation.toLowerCase().includes(searchTerm.toLowerCase()));
+      (m.occupation && m.occupation.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (Boolean(m.dob) && m.dob.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (Boolean(m.dom) && m.dom!.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesAgeGroup = selectedAgeGroup === 'ALL' || m.ageGroup === selectedAgeGroup;
     const matchesOccupation = selectedOccupation === 'ALL' ||
@@ -220,6 +222,7 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
                   <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Member</th>
                   <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Occupation / Profession</th>
                   <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Age Bracket</th>
+                  <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>DOB (Birthday)</th>
                   <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>WhatsApp Connect</th>
                   {isAdmin && (
                     <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
@@ -247,6 +250,9 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
                         <div className="skeleton-box" style={{ width: '65px', height: '24px', borderRadius: '9999px' }} />
                       </td>
                       <td style={{ padding: '16px 24px' }}>
+                        <div className="skeleton-box" style={{ width: '75px', height: '24px', borderRadius: '9999px' }} />
+                      </td>
+                      <td style={{ padding: '16px 24px' }}>
                         <div className="skeleton-box" style={{ width: '160px', height: '36px', borderRadius: '8px' }} />
                       </td>
                       {isAdmin && (
@@ -259,7 +265,7 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
                 ) : filteredMembers.length === 0 ? (
                   /* CLEAN EMPTY STATE - NO DUMMY DATA */
                   <tr>
-                    <td colSpan={isAdmin ? 5 : 4} style={{ padding: '56px 24px', textAlign: 'center' }}>
+                    <td colSpan={isAdmin ? 6 : 5} style={{ padding: '56px 24px', textAlign: 'center' }}>
                       <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(20, 184, 166, 0.12)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px', color: 'var(--accent-teal)' }}>
                         <Users size={26} />
                       </div>
@@ -340,6 +346,32 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
                           <span className={`badge ${getBadgeClass(member.ageGroup)}`}>
                             {member.ageGroup || 'N/A'}
                           </span>
+                        </td>
+
+                        {/* DOB (Date of Birth / Birthday) */}
+                        <td style={{ padding: '16px 24px' }}>
+                          {(member.dob || member.dom) ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '4px 10px',
+                                borderRadius: '9999px',
+                                background: 'rgba(245, 158, 11, 0.12)',
+                                border: '1px solid rgba(245, 158, 11, 0.3)',
+                                color: 'var(--accent-gold)',
+                                fontSize: '0.82rem',
+                                fontWeight: 700,
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <Cake size={13} color="var(--accent-gold)" />
+                              {member.dob || member.dom}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>—</span>
+                          )}
                         </td>
 
                         {/* Secure WhatsApp Link (NO PHONE NUMBER PRINTED FOR SECURITY) */}
@@ -461,9 +493,30 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
                         <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
                           {member.firstName} {member.lastName}
                         </h3>
-                        <span className={`badge ${getBadgeClass(member.ageGroup)}`}>
-                          Age: {member.ageGroup}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span className={`badge ${getBadgeClass(member.ageGroup)}`}>
+                            Age: {member.ageGroup}
+                          </span>
+                          {(member.dob || member.dom) && (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '2px 8px',
+                                borderRadius: '9999px',
+                                background: 'rgba(245, 158, 11, 0.12)',
+                                border: '1px solid rgba(245, 158, 11, 0.3)',
+                                color: 'var(--accent-gold)',
+                                fontSize: '0.75rem',
+                                fontWeight: 700
+                              }}
+                            >
+                              <Cake size={11} color="var(--accent-gold)" />
+                              DOB: {member.dob || member.dom}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 

@@ -147,6 +147,14 @@ export async function getMembersFromSheet() {
         if (isDummyMember(m)) return false;
         return true;
       })
+      .map(m => {
+        const dobVal = m.dob || m.dom ? String(m.dob || m.dom).trim() : '';
+        return {
+          ...m,
+          dob: dobVal,
+          dom: dobVal || undefined
+        };
+      })
       .reverse();
 
     cache.members.data = members;
@@ -170,6 +178,7 @@ export async function checkPhoneInSheet(phone) {
 }
 
 export async function addMemberToSheet(data) {
+  const dobVal = String(data.dob || data.dom || '').trim();
   const newMember = {
     id: `MEM-${Date.now().toString().slice(-6)}`,
     firstName: data.firstName.trim(),
@@ -178,6 +187,8 @@ export async function addMemberToSheet(data) {
     ageGroup: data.ageGroup,
     whatsappPhone: data.whatsappPhone.trim(),
     altPhone: data.altPhone ? data.altPhone.trim() : '',
+    dob: dobVal,
+    dom: dobVal,
     createdAt: new Date().toISOString()
   };
 
