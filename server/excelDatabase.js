@@ -143,17 +143,37 @@ function setVal(row, sheet, key, val) {
   }
 }
 
-// Ensure directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// Ensure directory exists safely
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (e) {
+  // Read-only filesystem in serverless
+}
+
+export async function saveWorkbookToFile(workbook) {
+  try {
+    if (process.env.VERCEL) {
+      const tmpPath = path.join('/tmp', 'licc_members_database.xlsx');
+      await workbook.xlsx.writeFile(tmpPath);
+      return;
+    }
+    await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
+  } catch (err) {
+    console.warn('Excel write warning (serverless / read-only filesystem):', err.message);
+  }
 }
 
 // Initialize Excel Workbook with worksheets if it does not exist
 export async function getWorkbook() {
   const workbook = new ExcelJS.Workbook();
+  const targetPath = (process.env.VERCEL && fs.existsSync(path.join('/tmp', 'licc_members_database.xlsx')))
+    ? path.join('/tmp', 'licc_members_database.xlsx')
+    : EXCEL_FILE_PATH;
 
-  if (fs.existsSync(EXCEL_FILE_PATH)) {
-    await workbook.xlsx.readFile(EXCEL_FILE_PATH);
+  if (fs.existsSync(targetPath)) {
+    await workbook.xlsx.readFile(targetPath);
   } else {
     // Create new worksheets
     createMembersSheet(workbook);
@@ -161,7 +181,7 @@ export async function getWorkbook() {
     createCommentsSheet(workbook);
     createEventsSheet(workbook);
     createExcosSheet(workbook);
-    await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
+    await saveWorkbookToFile(workbook);
   }
 
   // Ensure explicit columns are bound so ExcelJS methods work reliably
@@ -264,7 +284,7 @@ export async function getWorkbook() {
   }
   if (sChanged) {
     try {
-      await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
+      await saveWorkbookToFile(workbook);
     } catch (e) {
       // file might be locked, non-fatal
     }
@@ -466,7 +486,7 @@ export async function addMember(data) {
   };
 
   sheet.addRow(newMember);
-  await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
+  await saveWorkbookToFile(workbook);
   return newMember;
 }
 
@@ -484,7 +504,7 @@ export async function deleteMember(id) {
 
   if (targetRowIndex !== -1) {
     sheet.spliceRows(targetRowIndex, 1);
-    await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
+    await saveWorkbookToFile(workbook);
     return true;
   }
   return false;
@@ -553,7 +573,7 @@ export async function addShowcase(data) {
   };
 
   sheet.addRow(newPost);
-  await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
+  await saveWorkbookToFile(workbook);
   return { ...newPost, commentsCount: 0 };
 }
 
@@ -571,7 +591,7 @@ export async function likeShowcase(id) {
     }
   });
 
-  await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
+  await saveWorkbookToFile(workbook);
   return newLikes;
 }
 
@@ -611,7 +631,7 @@ export async function addComment(data) {
   };
 
   sheet.addRow(newComment);
-  await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
+  await saveWorkbookToFile(workbook);
   return newComment;
 }
 
@@ -732,7 +752,7 @@ export async function addEvent(data) {
   };
 
   sheet.addRow(newEvent);
-  await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
+  await saveWorkbookToFile(workbook);
   return newEvent;
 }
 
@@ -752,7 +772,7 @@ export async function deleteEvent(id) {
 
   if (targetRowIndex !== -1) {
     sheet.spliceRows(targetRowIndex, 1);
-    await workbook.xlsx.writeFile(EXCEL_FILE_PATH);
+    await saveWorkbookToFile(workbook);
     return true;
   }
   return false;

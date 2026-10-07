@@ -607,7 +607,11 @@ app.get('/api/excel/download', (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`LICC Backend Server running on http://localhost:${PORT}`);
-  console.log(`Backend Mode: ${isGoogleSheetsActive() ? 'Google Sheets (Live Cloud)' : 'Local Excel (.xlsx)'}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`LICC Backend Server running on http://localhost:${PORT}`);
+    console.log(`Backend Mode: ${isGoogleSheetsActive() ? 'Google Sheets (Live Cloud)' : 'Local Excel (.xlsx)'}`);
+  });
+}
+
+export default app;

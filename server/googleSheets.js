@@ -2,9 +2,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { INITIAL_EXCOS, isDummyMember, isDummyShowcase } from './excelDatabase.js';
 
+const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwvQgCBSDiYmqUs_RY1U-XrsSsvEkh_bCC2YCWhYhe5Df0XNOi3zzdd9HiN1O_0Elpxxw/exec';
+const DEFAULT_SHEETS_TOKEN = 'licc-fellowship-2026-secret-key';
+
 let config = {
-  url: process.env.GOOGLE_SHEETS_URL || '',
-  token: process.env.GOOGLE_SHEETS_TOKEN || 'CHANGE_ME_TO_A_LONG_RANDOM_SECRET'
+  url: process.env.GOOGLE_SHEETS_URL || DEFAULT_SHEETS_URL,
+  token: process.env.GOOGLE_SHEETS_TOKEN || DEFAULT_SHEETS_TOKEN
 };
 
 export function updateGoogleSheetsConfig(newUrl, newToken) {
