@@ -12,7 +12,8 @@ import {
   Menu, 
   X,
   ShieldCheck,
-  KeyRound
+  KeyRound,
+  QrCode
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAdmin } from '../context/AdminContext';
@@ -24,6 +25,7 @@ interface SidebarProps {
   activeTab: AppTab;
   setActiveTab: (tab: AppTab) => void;
   onOpenRegisterModal?: () => void;
+  onOpenQRModal?: () => void;
   memberCount: number;
   showcaseCount: number;
   eventCount?: number;
@@ -33,6 +35,8 @@ interface SidebarProps {
 export function Sidebar({
   activeTab,
   setActiveTab,
+  onOpenRegisterModal,
+  onOpenQRModal,
   memberCount,
   showcaseCount,
   eventCount = 0,
@@ -425,6 +429,30 @@ export function Sidebar({
               {isAdmin ? <ShieldCheck size={13} /> : <KeyRound size={13} />}
               <span>{isAdmin ? (adminUser?.role || 'Admin Active') : 'EXCO Login'}</span>
             </button>
+
+            {isAdmin && onOpenQRModal && (
+              <button
+                type="button"
+                onClick={onOpenQRModal}
+                title="Portal QR Code (Admins Only)"
+                style={{
+                  background: 'rgba(20, 184, 166, 0.12)',
+                  border: '1px solid rgba(20, 184, 166, 0.25)',
+                  color: 'var(--accent-teal-bright)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.72rem',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  fontWeight: 600
+                }}
+              >
+                <QrCode size={13} />
+                <span>QR</span>
+              </button>
+            )}
 
             <button
               type="button"

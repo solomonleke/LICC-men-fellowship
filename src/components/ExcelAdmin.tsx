@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Download,
   RefreshCw,
@@ -12,17 +12,23 @@ import {
   AlertCircle,
   HelpCircle,
   Link,
-  ShieldCheck
+  ShieldCheck,
+  QrCode,
+  Printer,
+  Sparkles
 } from 'lucide-react';
 import { BackendStats, AgeGroup } from '../types';
 import { getExcelDownloadUrl, fetchSheetsConfig, saveSheetsConfig, testSheetsUrl } from '../services/api';
+import { QRCode } from '../utils/qrGenerator';
+import { AdminQRCodeModal } from './AdminQRCodeModal';
 
 interface ExcelAdminProps {
   stats: BackendStats | null;
   onRefreshStats: () => void;
+  onOpenQRModal?: () => void;
 }
 
-export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats }) => {
+export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats, onOpenQRModal }) => {
   const ageGroupsList: AgeGroup[] = ['18-29', '30-39', '40-49', '50-59', '60 and above'];
 
   const [sheetsUrl, setSheetsUrl] = useState('');
@@ -33,6 +39,12 @@ export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats })
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [showGuide, setShowGuide] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // QR Code State
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [copiedShortlink, setCopiedShortlink] = useState(false);
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const portalShortlink = 'https://ln.run/Wh312';
 
   useEffect(() => {
     loadConfig();
@@ -69,6 +81,158 @@ export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats })
       setStatusMsg({ type: 'error', text: err.message || 'Failed to save configuration.' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (qrCanvasRef.current) {
+      try {
+        const qr = new QRCode(portalShortlink, 0, 'M');
+        qr.drawToCanvas(qrCanvasRef.current, 280, '#0a0f1d', '#ffffff');
+      } catch (err) {
+        console.error('Admin QR Code preview render error:', err);
+      }
+    }
+  }, []);
+
+  const handleCopyShortlink = () => {
+    navigator.clipboard.writeText(portalShortlink);
+    setCopiedShortlink(true);
+    setTimeout(() => setCopiedShortlink(false), 2000);
+  };
+
+  const handleDownloadCleanPNG = () => {
+    try {
+      const qr = new QRCode(portalShortlink, 0, 'M');
+      const offscreenCanvas = document.createElement('canvas');
+      qr.drawToCanvas(offscreenCanvas, 1024, '#0a0f1d', '#ffffff');
+      const a = document.createElement('a');
+      a.download = `LICC_Portal_QR_Wh312.png`;
+      a.href = offscreenCanvas.toDataURL('image/png');
+      a.click();
+    } catch (err) {
+      console.error('Clean PNG download failed:', err);
+    }
+  };
+
+  const handleDownloadSVG = () => {
+    try {
+      const qr = new QRCode(portalShortlink, 0, 'M');
+      const svg = qr.toSVGString(600, '#0a0f1d', '#ffffff');
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const a = document.createElement('a');
+      a.download = `LICC_Portal_QR_Wh312.svg`;
+      a.href = URL.createObjectURL(blob);
+      a.click();
+    } catch (err) {
+      console.error('SVG download failed:', err);
+    }
+  };
+
+  const handleDownloadPrintableFlyer = () => {
+    try {
+      const qr = new QRCode(portalShortlink, 0, 'M');
+      const flyerCanvas = document.createElement('canvas');
+      flyerCanvas.width = 1200;
+      flyerCanvas.height = 1500;
+      const ctx = flyerCanvas.getContext('2d');
+      if (!ctx) return;
+
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, 1500);
+      bgGrad.addColorStop(0, '#06131c');
+      bgGrad.addColorStop(0.5, '#0a1d28');
+      bgGrad.addColorStop(1, '#050c12');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, 1200, 1500);
+
+      const goldGrad = ctx.createLinearGradient(150, 0, 1050, 0);
+      goldGrad.addColorStop(0, '#14b8a6');
+      goldGrad.addColorStop(0.5, '#f59e0b');
+      goldGrad.addColorStop(1, '#14b8a6');
+      ctx.fillStyle = goldGrad;
+      ctx.fillRect(150, 60, 900, 6);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 52px system-ui, -apple-system, sans-serif';
+      ctx.fillText("LICC MEN'S FELLOWSHIP", 600, 150);
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = '600 28px system-ui, -apple-system, sans-serif';
+      ctx.fillText('LIGHT INTERNATIONAL CHRISTIAN CENTRE', 600, 195);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '400 24px system-ui, -apple-system, sans-serif';
+      ctx.fillText('Samonda, Ibadan • Member Directory & Business Showcase', 600, 235);
+
+      const cardX = 220;
+      const cardY = 300;
+      const cardSize = 760;
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+      ctx.shadowBlur = 40;
+      ctx.shadowOffsetY = 20;
+
+      const radius = 28;
+      ctx.beginPath();
+      ctx.moveTo(cardX + radius, cardY);
+      ctx.lineTo(cardX + cardSize - radius, cardY);
+      ctx.quadraticCurveTo(cardX + cardSize, cardY, cardX + cardSize, cardY + radius);
+      ctx.lineTo(cardX + cardSize, cardY + cardSize - radius);
+      ctx.quadraticCurveTo(cardX + cardSize, cardY + cardSize, cardX + cardSize - radius, cardY + cardSize);
+      ctx.lineTo(cardX + radius, cardY + cardSize);
+      ctx.quadraticCurveTo(cardX, cardY + cardSize, cardX, cardY + cardSize - radius);
+      ctx.lineTo(cardX, cardY + radius);
+      ctx.quadraticCurveTo(cardX, cardY, cardX + radius, cardY);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+
+      const qrCanvas = document.createElement('canvas');
+      qr.drawToCanvas(qrCanvas, 660, '#0a0f1d', '#ffffff');
+      ctx.drawImage(qrCanvas, cardX + 50, cardY + 50, 660, 660);
+
+      ctx.fillStyle = '#14b8a6';
+      ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
+      ctx.fillText('SCAN WITH YOUR PHONE CAMERA', 600, 1140);
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '500 28px system-ui, -apple-system, sans-serif';
+      ctx.fillText('Or visit directly via browser:', 600, 1195);
+
+      const pillWidth = 480;
+      const pillHeight = 64;
+      const pillX = (1200 - pillWidth) / 2;
+      const pillY = 1230;
+      ctx.fillStyle = 'rgba(20, 184, 166, 0.15)';
+      ctx.strokeStyle = '#14b8a6';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (typeof (ctx as any).roundRect === 'function') {
+        (ctx as any).roundRect(pillX, pillY, pillWidth, pillHeight, 32);
+      } else {
+        ctx.rect(pillX, pillY, pillWidth, pillHeight);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 32px monospace';
+      ctx.fillText(portalShortlink, 600, 1272);
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '400 22px system-ui, -apple-system, sans-serif';
+      ctx.fillText('Official LICC Men Fellowship Digital Portal • 2026', 600, 1370);
+
+      const a = document.createElement('a');
+      a.download = `LICC_Men_Fellowship_Flyer_Wh312.png`;
+      a.href = flyerCanvas.toDataURL('image/png');
+      a.click();
+    } catch (err) {
+      console.error('Printable flyer download failed:', err);
     }
   };
 
@@ -115,10 +279,150 @@ export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats })
           <button onClick={onRefreshStats} className="btn-secondary">
             <RefreshCw size={16} /> Refresh Metrics
           </button>
+          <button onClick={() => setIsQRModalOpen(true)} className="btn-secondary" style={{ borderColor: 'var(--accent-teal)' }}>
+            <QrCode size={16} color="var(--accent-teal)" /> Portal QR Code
+          </button>
           <a href={getExcelDownloadUrl()} download className="btn-primary btn-gold" style={{ textDecoration: 'none' }}>
             <Download size={18} /> Download .XLSX
           </a>
         </div>
+      </div>
+
+      {/* Portal QR Code & Mobile Access Hub (Admin Only) */}
+      <div className="glass-card" style={{ padding: '24px', border: '1px solid var(--glass-border-teal)' }}>
+        
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '20px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: 'rgba(20, 184, 166, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--accent-teal)'
+            }}>
+              <QrCode size={22} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>
+                  Fellowship Portal QR Code & Mobile Access
+                </h3>
+                <span className="badge badge-gold" style={{ textTransform: 'none' }}>
+                  <ShieldCheck size={11} /> Admin Only
+                </span>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Embedded short link: <strong style={{ color: 'var(--accent-teal-bright)' }}>{portalShortlink}</strong>
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setIsQRModalOpen(true)}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem' }}
+            >
+              <QrCode size={15} color="var(--accent-teal)" />
+              <span>Full Screen / Projector View</span>
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', alignItems: 'center' }}>
+          {/* QR Canvas Display */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              padding: '16px',
+              borderRadius: '16px',
+              background: '#ffffff',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+              border: '3px solid #ffffff',
+              display: 'inline-block'
+            }}>
+              <canvas
+                ref={qrCanvasRef}
+                style={{ width: '190px', height: '190px', display: 'block' }}
+              />
+            </div>
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+              Scan with phone camera to test
+            </span>
+          </div>
+
+          {/* Details & Download Options */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div>
+              <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Shortlink Target
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                <input
+                  type="text"
+                  readOnly
+                  value={portalShortlink}
+                  className="input-field"
+                  style={{ fontFamily: 'monospace', fontSize: '0.92rem', color: 'var(--accent-teal-bright)' }}
+                />
+                <button
+                  onClick={handleCopyShortlink}
+                  className="btn-secondary"
+                  style={{ padding: '10px 14px', flexShrink: 0 }}
+                  title="Copy short link"
+                >
+                  {copiedShortlink ? <Check size={16} color="var(--accent-teal)" /> : <Copy size={16} />}
+                </button>
+                <a
+                  href={portalShortlink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary"
+                  style={{ padding: '10px 14px', flexShrink: 0 }}
+                  title="Open in new tab"
+                >
+                  <ExternalLink size={16} />
+                </a>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+              Use this QR code during Sunday services, monthly meetings, and outreach programs. Brothers can point their phone camera to instantly register, view the member directory, or check out business showcases.
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleDownloadPrintableFlyer}
+                className="btn-primary btn-gold"
+                style={{ fontSize: '0.86rem', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Printer size={16} />
+                <span>Download Printable Flyer (PNG)</span>
+              </button>
+
+              <button
+                onClick={handleDownloadCleanPNG}
+                className="btn-secondary"
+                style={{ fontSize: '0.86rem', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={15} />
+                <span>Clean QR (PNG)</span>
+              </button>
+
+              <button
+                onClick={handleDownloadSVG}
+                className="btn-secondary"
+                style={{ fontSize: '0.86rem', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={15} />
+                <span>Vector (SVG)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* Google Sheets Connection Card */}
@@ -352,6 +656,13 @@ export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats })
         </div>
 
       </div>
+
+      {/* Admin QR Code Modal */}
+      <AdminQRCodeModal
+        isOpen={isQRModalOpen}
+        onClose={() => setIsQRModalOpen(false)}
+        defaultUrl={portalShortlink}
+      />
 
     </section>
   );

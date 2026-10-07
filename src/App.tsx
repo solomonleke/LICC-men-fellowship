@@ -8,6 +8,7 @@ import { EventsView } from './components/EventsView';
 import { ExcoMembers } from './components/ExcoMembers';
 import { MemberFormModal } from './components/MemberFormModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { AdminQRCodeModal } from './components/AdminQRCodeModal';
 import { Member, ShowcasePost, ExcelStats } from './types';
 import { fetchMembers, deleteMember, fetchShowcases, fetchExcelStats } from './services/api';
 import { useAdmin } from './context/AdminContext';
@@ -20,6 +21,7 @@ export function App() {
   const [members, setMembers] = useState<Member[]>([]);
   const [showcases, setShowcases] = useState<ShowcasePost[]>([]);
   const [excelStats, setExcelStats] = useState<ExcelStats | null>(null);
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -242,6 +244,7 @@ export function App() {
         setActiveTab={setActiveTab}
         memberCount={validMembers.length}
         showcaseCount={validShowcases.length}
+        onOpenQRModal={() => setIsQRModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -466,6 +469,7 @@ export function App() {
             <ExcelAdmin
               stats={excelStats}
               onRefreshStats={() => loadData()}
+              onOpenQRModal={() => setIsQRModalOpen(true)}
             />
           )}
 
@@ -480,6 +484,13 @@ export function App() {
 
         {/* EXCO Admin Authentication Modal */}
         <AdminLoginModal />
+
+        {/* Admin QR Code Modal (Admins Only) */}
+        <AdminQRCodeModal
+          isOpen={isQRModalOpen}
+          onClose={() => setIsQRModalOpen(false)}
+          defaultUrl="https://ln.run/Wh312"
+        />
 
         {/* Footer */}
         <footer style={{ borderTop: '1px solid var(--glass-border)', padding: '18px 28px', textAlign: 'center', fontSize: '0.82rem', color: 'var(--text-muted)', background: 'var(--nav-pill-bg)', marginTop: 'auto' }}>
