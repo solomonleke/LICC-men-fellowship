@@ -149,6 +149,7 @@ export async function fetchExcelStats(): Promise<BackendStats> {
     totalComments: 0,
     source: 'Standby / Cloud Fallback',
     isGoogleSheets: true,
+    lastModified: new Date().toISOString(),
     ageGroupBreakdown: {
       '18-29': 0,
       '30-39': 0,
