@@ -15,6 +15,7 @@ export function updateGoogleSheetsConfig(newUrl, newToken) {
   config.token = newToken ? newToken.trim() : config.token;
   process.env.GOOGLE_SHEETS_URL = config.url;
   process.env.GOOGLE_SHEETS_TOKEN = config.token;
+  invalidateCache();
   return config;
 }
 
@@ -47,6 +48,29 @@ export async function testConnection() {
     return { ok: false, error: err.message };
   }
 }
+
+// ----------------- IN-MEMORY CACHE & DEDUPLICATION -----------------
+const CACHE_TTL_MS = 15000; // 15 seconds read cache
+
+const cache = {
+  members: { data: null, timestamp: 0 },
+  showcases: { data: null, timestamp: 0 },
+  comments: { data: null, timestamp: 0 },
+  events: { data: null, timestamp: 0 },
+  excos: { data: null, timestamp: 0 }
+};
+
+export function invalidateCache(sheetName) {
+  if (sheetName) {
+    const key = sheetName.toLowerCase();
+    if (cache[key]) cache[key].timestamp = 0;
+  } else {
+    Object.keys(cache).forEach(k => { cache[k].timestamp = 0; });
+  }
+}
+
+// Track in-flight promises so identical simultaneous requests share the same promise
+const inFlightRequests = new Map();
 
 async function callScript(payload) {
   if (!config.url) {
@@ -84,23 +108,58 @@ async function callScript(payload) {
   return json.data;
 }
 
+// Single-flight deduplicated caller for reads
+async function callScriptDeduplicated(payload) {
+  if (payload.action !== 'list') {
+    return callScript(payload);
+  }
+
+  const flightKey = `${payload.sheet}_list`;
+  if (inFlightRequests.has(flightKey)) {
+    return inFlightRequests.get(flightKey);
+  }
+
+  const promise = callScript(payload).finally(() => {
+    inFlightRequests.delete(flightKey);
+  });
+
+  inFlightRequests.set(flightKey, promise);
+  return promise;
+}
+
 // ----------------- MEMBERS -----------------
 
 export async function getMembersFromSheet() {
-  const rows = await callScript({ sheet: 'Members', action: 'list' });
-  return (rows || [])
-    .filter(m => {
-      const fName = String(m.firstName || '').trim();
-      const lName = String(m.lastName || '').trim();
-      const phone = String(m.whatsappPhone || '').trim();
-      const id = String(m.id || '');
-      const fullName = `${fName} ${lName}`.toLowerCase();
-      if (!fName && !lName && !phone) return false;
-      if (fName.toUpperCase() === 'N/A' && lName.toUpperCase() === 'N/A') return false;
-      if (isDummyMember(m)) return false;
-      return true;
-    })
-    .reverse();
+  const now = Date.now();
+  if (cache.members.data && (now - cache.members.timestamp < CACHE_TTL_MS)) {
+    return cache.members.data;
+  }
+
+  try {
+    const rows = await callScriptDeduplicated({ sheet: 'Members', action: 'list' });
+    const members = (rows || [])
+      .filter(m => {
+        const fName = String(m.firstName || '').trim();
+        const lName = String(m.lastName || '').trim();
+        const phone = String(m.whatsappPhone || '').trim();
+        if (!fName && !lName && !phone) return false;
+        if (fName.toUpperCase() === 'N/A' && lName.toUpperCase() === 'N/A') return false;
+        if (isDummyMember(m)) return false;
+        return true;
+      })
+      .reverse();
+
+    cache.members.data = members;
+    cache.members.timestamp = Date.now();
+    return members;
+  } catch (err) {
+    console.warn('getMembersFromSheet fetch error:', err.message);
+    // If we have previously cached data, return it instead of an empty array
+    if (cache.members.data && cache.members.data.length > 0) {
+      return cache.members.data;
+    }
+    return [];
+  }
 }
 
 export async function checkPhoneInSheet(phone) {
@@ -129,6 +188,8 @@ export async function addMemberToSheet(data) {
       record: newMember,
       uniqueField: 'whatsappPhone'
     });
+    // Invalidate member cache so subsequent fetches get fresh data
+    invalidateCache('members');
     return newMember;
   } catch (err) {
     if (err.message === 'DUPLICATE_PHONE') {
@@ -140,19 +201,25 @@ export async function addMemberToSheet(data) {
 
 export async function deleteMemberFromSheet(id) {
   await callScript({ sheet: 'Members', action: 'delete', id });
+  invalidateCache('members');
   return true;
 }
 
 // ----------------- SHOWCASES -----------------
 
 export async function getShowcasesFromSheet() {
+  const now = Date.now();
+  if (cache.showcases.data && (now - cache.showcases.timestamp < CACHE_TTL_MS)) {
+    return cache.showcases.data;
+  }
+
   try {
     const [showcases, comments] = await Promise.all([
-      callScript({ sheet: 'Showcases', action: 'list' }).catch(err => {
+      callScriptDeduplicated({ sheet: 'Showcases', action: 'list' }).catch(err => {
         console.warn('Showcases sheet fetch warning:', err.message);
-        return [];
+        return cache.showcases.data || [];
       }),
-      callScript({ sheet: 'Comments', action: 'list' }).catch(err => {
+      callScriptDeduplicated({ sheet: 'Comments', action: 'list' }).catch(err => {
         console.warn('Comments sheet fetch warning:', err.message);
         return [];
       })
@@ -163,15 +230,23 @@ export async function getShowcasesFromSheet() {
       commentsMap[c.postId] = (commentsMap[c.postId] || 0) + 1;
     });
 
-    return (showcases || [])
+    const parsed = (showcases || [])
       .filter(p => p.title && p.authorName && !isDummyShowcase(p))
       .map(p => ({
         ...p,
         likes: Number(p.likes || 0),
         commentsCount: commentsMap[p.id] || 0
-      })).reverse();
+      }))
+      .reverse();
+
+    cache.showcases.data = parsed;
+    cache.showcases.timestamp = Date.now();
+    return parsed;
   } catch (err) {
     console.warn('Showcases fetch error:', err.message);
+    if (cache.showcases.data && cache.showcases.data.length > 0) {
+      return cache.showcases.data;
+    }
     return [];
   }
 }
@@ -196,6 +271,7 @@ export async function addShowcaseToSheet(data) {
     record: newPost
   });
 
+  invalidateCache('showcases');
   return { ...newPost, likes: 0, commentsCount: 0 };
 }
 
@@ -206,13 +282,14 @@ export async function likeShowcaseInSheet(id) {
     id,
     field: 'likes'
   });
+  invalidateCache('showcases');
   return Number(newLikes);
 }
 
 // ----------------- COMMENTS -----------------
 
 export async function getCommentsFromSheet(postId) {
-  const allComments = await callScript({ sheet: 'Comments', action: 'list' });
+  const allComments = await callScriptDeduplicated({ sheet: 'Comments', action: 'list' });
   return (allComments || []).filter(c => c.postId === String(postId)).reverse();
 }
 
@@ -231,25 +308,18 @@ export async function addCommentToSheet(data) {
     record: newComment
   });
 
+  invalidateCache('comments');
+  invalidateCache('showcases');
   return newComment;
 }
 
 // ----------------- STATS -----------------
 
 export async function getStatsFromSheet() {
-  const [members, showcases, comments] = await Promise.all([
-    callScript({ sheet: 'Members', action: 'list' }).catch(err => {
-      console.warn('Members sheet fetch warning:', err.message);
-      return [];
-    }),
-    callScript({ sheet: 'Showcases', action: 'list' }).catch(err => {
-      console.warn('Showcases sheet fetch warning:', err.message);
-      return [];
-    }),
-    callScript({ sheet: 'Comments', action: 'list' }).catch(err => {
-      console.warn('Comments sheet fetch warning:', err.message);
-      return [];
-    })
+  // Leverage cached members and showcases so stats doesn't flood Google Apps Script with 3 redundant calls!
+  const [members, showcases] = await Promise.all([
+    getMembersFromSheet(),
+    getShowcasesFromSheet()
   ]);
 
   const ageGroupBreakdown = {
@@ -260,29 +330,16 @@ export async function getStatsFromSheet() {
     '60 and above': 0
   };
 
-  const validMembers = (members || []).filter(m => {
-    const fName = String(m.firstName || '').trim();
-    const lName = String(m.lastName || '').trim();
-    const phone = String(m.whatsappPhone || '').trim();
-    if (!fName && !lName && !phone) return false;
-    if (fName.toUpperCase() === 'N/A' && lName.toUpperCase() === 'N/A') return false;
-    return true;
-  });
-
-  validMembers.forEach(m => {
+  (members || []).forEach(m => {
     if (ageGroupBreakdown[m.ageGroup] !== undefined) {
       ageGroupBreakdown[m.ageGroup]++;
     }
   });
 
-  const validShowcases = (showcases || []).filter(s =>
-    s.title && s.authorName && !isDummyShowcase(s)
-  );
-
   return {
-    totalMembers: validMembers.length,
-    totalShowcases: validShowcases.length,
-    totalComments: (comments || []).length,
+    totalMembers: (members || []).length,
+    totalShowcases: (showcases || []).length,
+    totalComments: 0,
     source: 'Google Sheets (Live Cloud)',
     ageGroupBreakdown,
     lastModified: new Date().toISOString()
@@ -292,12 +349,22 @@ export async function getStatsFromSheet() {
 // ----------------- EXCOS -----------------
 
 export async function getExcosFromSheet() {
+  const now = Date.now();
+  if (cache.excos.data && (now - cache.excos.timestamp < CACHE_TTL_MS * 4)) {
+    return cache.excos.data;
+  }
+
   try {
-    const excos = await callScript({ sheet: 'Excos', action: 'list' });
+    const excos = await callScriptDeduplicated({ sheet: 'Excos', action: 'list' });
     if (excos && Array.isArray(excos) && excos.length > 0) {
-      return excos
+      const sorted = excos
         .filter(ex => ex.name && ex.role)
         .sort((a, b) => Number(a.order || 99) - Number(b.order || 99));
+      if (sorted.length > 0) {
+        cache.excos.data = sorted;
+        cache.excos.timestamp = Date.now();
+        return sorted;
+      }
     }
   } catch (err) {
     console.warn('Excos sheet fetch error, using INITIAL_EXCOS:', err.message);
@@ -308,13 +375,24 @@ export async function getExcosFromSheet() {
 // ----------------- EVENTS -----------------
 
 export async function getEventsFromSheet() {
+  const now = Date.now();
+  if (cache.events.data && (now - cache.events.timestamp < CACHE_TTL_MS)) {
+    return cache.events.data;
+  }
+
   try {
-    const events = await callScript({ sheet: 'Events', action: 'list' });
-    return (events || [])
+    const events = await callScriptDeduplicated({ sheet: 'Events', action: 'list' });
+    const parsed = (events || [])
       .filter(e => e.title && e.eventDate)
       .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+    cache.events.data = parsed;
+    cache.events.timestamp = Date.now();
+    return parsed;
   } catch (err) {
     console.warn('Events sheet fetch error:', err.message);
+    if (cache.events.data && cache.events.data.length > 0) {
+      return cache.events.data;
+    }
     return [];
   }
 }
@@ -339,10 +417,12 @@ export async function addEventToSheet(data) {
     record: newEvent
   });
 
+  invalidateCache('events');
   return newEvent;
 }
 
 export async function deleteEventFromSheet(id) {
   await callScript({ sheet: 'Events', action: 'delete', id });
+  invalidateCache('events');
   return true;
 }

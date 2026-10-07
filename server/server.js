@@ -136,6 +136,13 @@ app.get('/api/members', async (req, res) => {
     if (isGoogleSheetsActive()) {
       try {
         const members = await getMembersFromSheet();
+        if (Array.isArray(members) && members.length > 0) {
+          return res.json(members);
+        }
+        const localMembers = await getLocalMembers();
+        if (Array.isArray(localMembers) && localMembers.length > 0) {
+          return res.json(localMembers);
+        }
         if (Array.isArray(members)) {
           return res.json(members);
         }
@@ -284,12 +291,14 @@ app.get('/api/showcases', async (req, res) => {
     if (isGoogleSheetsActive()) {
       try {
         const showcases = await getShowcasesFromSheet();
+        if (Array.isArray(showcases) && showcases.length > 0) {
+          return res.json(showcases);
+        }
+        const localShowcases = await getLocalShowcases();
+        if (Array.isArray(localShowcases) && localShowcases.length > 0) {
+          return res.json(localShowcases);
+        }
         if (Array.isArray(showcases)) {
-          const localShowcases = await getLocalShowcases();
-          // If Google Sheet is empty but local has showcases, prefer local
-          if (showcases.length === 0 && localShowcases.length > 0) {
-            return res.json(localShowcases);
-          }
           return res.json(showcases);
         }
       } catch (sheetErr) {

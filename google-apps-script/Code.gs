@@ -62,9 +62,18 @@ function doPost(e) {
     return json({ ok: false, error: 'Unauthorized' });
   }
 
-  // One request at a time, so two people can't register the same phone simultaneously
+  // READ requests (list) do not mutate data — process immediately without locking
+  if (body.action === 'list') {
+    try {
+      return json({ ok: true, data: handle(body) });
+    } catch (err) {
+      return json({ ok: false, error: String((err && err.message) || err) });
+    }
+  }
+
+  // WRITE requests (append, increment, delete) acquire lock to prevent concurrent write races
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  lock.waitLock(15000);
   try {
     return json({ ok: true, data: handle(body) });
   } catch (err) {

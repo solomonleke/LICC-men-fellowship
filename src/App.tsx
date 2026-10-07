@@ -66,9 +66,12 @@ export function App() {
         }),
       ]);
 
-      setMembers(membersData);
-      setShowcases(showcasesData);
-      setExcelStats(statsData);
+      // Resilient state preservation: Never wipe out existing records on transient background hiccups
+      setMembers((prev) => (membersData && (membersData.length > 0 || prev.length === 0) ? membersData : prev));
+      setShowcases((prev) => (showcasesData && (showcasesData.length > 0 || prev.length === 0) ? showcasesData : prev));
+      if (statsData) {
+        setExcelStats(statsData);
+      }
       setLastSyncedAt(new Date());
       setSyncStatus(navigator.onLine ? 'synced' : 'offline');
 

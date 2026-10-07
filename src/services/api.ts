@@ -17,7 +17,7 @@ export async function fetchMembers(): Promise<Member[]> {
     const staticRes = await fetch('/data/members.json');
     if (staticRes.ok) {
       const data = await staticRes.json();
-      if (Array.isArray(data)) return data;
+      if (Array.isArray(data) && data.length > 0) return data;
     }
   } catch (e) {
     // ignore
@@ -80,7 +80,7 @@ export async function fetchShowcases(): Promise<ShowcasePost[]> {
     const staticRes = await fetch('/data/showcases.json');
     if (staticRes.ok) {
       const data = await staticRes.json();
-      if (Array.isArray(data)) return data;
+      if (Array.isArray(data) && data.length > 0) return data;
     }
   } catch (e) {
     // ignore
