@@ -14,8 +14,7 @@ import {
   Link,
   ShieldCheck,
   QrCode,
-  Printer,
-  Sparkles
+  Printer
 } from 'lucide-react';
 import { BackendStats, AgeGroup } from '../types';
 import { getExcelDownloadUrl, fetchSheetsConfig, saveSheetsConfig, testSheetsUrl } from '../services/api';
@@ -322,7 +321,7 @@ export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats, o
 
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
-              onClick={() => setIsQRModalOpen(true)}
+              onClick={() => (onOpenQRModal ? onOpenQRModal() : setIsQRModalOpen(true))}
               className="btn-secondary"
               style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem' }}
             >

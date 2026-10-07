@@ -272,7 +272,6 @@ export class QRCode {
 
     // 2. Select optimal mask pattern (0..7) by lowest penalty
     let minLostPoint = Number.MAX_VALUE;
-    let bestPattern = 0;
     let bestModules: boolean[][] = [];
 
     for (let mask = 0; mask < 8; mask++) {
@@ -280,7 +279,6 @@ export class QRCode {
       const lostPoint = this.getLostPoint(trialModules);
       if (lostPoint < minLostPoint) {
         minLostPoint = lostPoint;
-        bestPattern = mask;
         bestModules = trialModules;
       }
     }

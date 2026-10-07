@@ -24,7 +24,6 @@ export type AppTab = 'directory' | 'showcase' | 'events' | 'excos' | 'excel-admi
 interface SidebarProps {
   activeTab: AppTab;
   setActiveTab: (tab: AppTab) => void;
-  onOpenRegisterModal?: () => void;
   onOpenQRModal?: () => void;
   memberCount: number;
   showcaseCount: number;
@@ -35,7 +34,6 @@ interface SidebarProps {
 export function Sidebar({
   activeTab,
   setActiveTab,
-  onOpenRegisterModal,
   onOpenQRModal,
   memberCount,
   showcaseCount,
