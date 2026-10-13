@@ -144,7 +144,7 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
 
             <button onClick={onOpenRegisterModal} className="btn-primary">
               <UserPlus size={18} />
-              Add Member Record
+              Become a member
             </button>
           </div>
         </div>
@@ -279,7 +279,7 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
                       </p>
                       {validMembers.length === 0 ? (
                         <button onClick={onOpenRegisterModal} className="btn-primary btn-gold" style={{ margin: '0 auto' }}>
-                          <UserPlus size={16} /> Add Member Record
+                          <UserPlus size={16} /> Become a member
                         </button>
                       ) : (
                         <button onClick={() => { setSearchTerm(''); setSelectedAgeGroup('ALL'); setSelectedOccupation('ALL'); }} className="btn-secondary" style={{ margin: '0 auto' }}>
@@ -451,7 +451,7 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
               </p>
               {validMembers.length === 0 ? (
                 <button onClick={onOpenRegisterModal} className="btn-primary btn-gold" style={{ margin: '0 auto' }}>
-                  <UserPlus size={16} /> Add Member Record
+                  <UserPlus size={16} /> Become a member
                 </button>
               ) : (
                 <button onClick={() => { setSearchTerm(''); setSelectedAgeGroup('ALL'); setSelectedOccupation('ALL'); }} className="btn-secondary" style={{ margin: '0 auto' }}>

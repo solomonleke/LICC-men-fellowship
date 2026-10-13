@@ -360,7 +360,7 @@ export function App() {
               style={{ padding: '9px 18px', fontSize: '0.88rem' }}
             >
               <UserPlus size={16} />
-              <span>Add Member</span>
+              <span>Become a member</span>
             </button>
           </div>
         </header>

@@ -149,10 +149,10 @@ export function Navbar({
             </button>
           </div>
 
-          {/* Add Member Button */}
+          {/* Become a member Button */}
           <button onClick={onOpenRegisterModal} className="btn-primary btn-gold">
             <UserPlus size={18} />
-            Add Member Record
+            Become a member
           </button>
         </div>
 
