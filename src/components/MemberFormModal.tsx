@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, CheckCircle, AlertTriangle, AlertCircle, ShieldCheck, Loader2, ChevronDown, Search, Check, Cake } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, AlertCircle, ShieldCheck, Loader2, ChevronDown, Search, Check, Cake, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { AgeGroup, Member, OCCUPATIONS } from '../types';
-import { checkPhoneUniqueness, createMember } from '../services/api';
+import { checkPhoneUniqueness, createMember, updateMember } from '../services/api';
 import { validatePhoneNumber } from '../utils/phoneValidation';
+import { useAdmin } from '../context/AdminContext';
 
 const DOB_MONTHS = [
   { value: 'Jan', label: 'January' },
@@ -21,13 +22,49 @@ const DOB_MONTHS = [
 
 const DOB_DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
 
+function parseDobToMonthDay(dob?: string): { month: string; day: string } {
+  const raw = String(dob || '').trim();
+  if (!raw) return { month: '', day: '' };
+
+  const matchDayFirst = raw.match(/^(\d{1,2})[\s\-/]+([A-Za-z]+)/);
+  if (matchDayFirst) {
+    const day = String(Number(matchDayFirst[1]));
+    const monthCode = matchDayFirst[2].slice(0, 3).toLowerCase();
+    const matched = DOB_MONTHS.find((m) => m.value.toLowerCase() === monthCode);
+    if (matched) return { month: matched.value, day };
+  }
+
+  const matchMonthFirst = raw.match(/^([A-Za-z]+)[\s\-/]+(\d{1,2})/);
+  if (matchMonthFirst) {
+    const monthCode = matchMonthFirst[1].slice(0, 3).toLowerCase();
+    const day = String(Number(matchMonthFirst[2]));
+    const matched = DOB_MONTHS.find((m) => m.value.toLowerCase() === monthCode);
+    if (matched) return { month: matched.value, day };
+  }
+
+  return { month: '', day: '' };
+}
+
 interface MemberFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onMemberAdded: (member: Member) => void;
+  editingMember?: Member | null;
+  verifiedEditPin?: string;
+  onMemberUpdated?: (member: Member) => void;
 }
 
-export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClose, onMemberAdded }) => {
+export const MemberFormModal: React.FC<MemberFormModalProps> = ({
+  isOpen,
+  onClose,
+  onMemberAdded,
+  editingMember = null,
+  verifiedEditPin,
+  onMemberUpdated
+}) => {
+  const { isAdmin, passcode } = useAdmin();
+  const isEditMode = Boolean(editingMember);
+
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [occupation, setOccupation] = useState<string>(OCCUPATIONS[0]);
@@ -40,11 +77,43 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
   const [altPhone, setAltPhone] = useState('');
   const [dobMonth, setDobMonth] = useState('');
   const [dobDay, setDobDay] = useState('');
+  const [editPin, setEditPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
 
   const [phoneChecking, setPhoneChecking] = useState(false);
   const [isDuplicate, setIsDuplicate] = useState<boolean | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Sync form fields when opening in create vs edit mode
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (editingMember) {
+      setFirstName(editingMember.firstName || '');
+      setLastName(editingMember.lastName || '');
+      const occ = editingMember.occupation || OCCUPATIONS[0];
+      if (OCCUPATIONS.includes(occ as any)) {
+        setOccupation(occ);
+        setCustomOccupation('');
+      } else {
+        setOccupation('Other');
+        setCustomOccupation(occ);
+      }
+      setAgeGroup((editingMember.ageGroup as AgeGroup) || '30-39');
+      setWhatsappPhone(editingMember.whatsappPhone || '');
+      setAltPhone(editingMember.altPhone || '');
+      const parsedDob = parseDobToMonthDay(editingMember.dob || editingMember.dom);
+      setDobMonth(parsedDob.month);
+      setDobDay(parsedDob.day);
+      setEditPin('');
+      setShowPin(false);
+      setIsDuplicate(false);
+      setErrorMsg(null);
+    } else {
+      resetForm();
+    }
+  }, [isOpen, editingMember]);
 
   // Close occupation dropdown on outside click
   useEffect(() => {
@@ -82,10 +151,20 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
     }
 
     const timer = setTimeout(async () => {
+      const queryNum = val.normalized || whatsappPhone.trim();
+      const origNormalized = editingMember
+        ? (validatePhoneNumber(editingMember.whatsappPhone).normalized || editingMember.whatsappPhone.trim())
+        : '';
+
+      if (editingMember && origNormalized && queryNum === origNormalized) {
+        setIsDuplicate(false);
+        setErrorMsg(null);
+        return;
+      }
+
       setPhoneChecking(true);
       try {
-        const queryNum = val.normalized || whatsappPhone.trim();
-        const res = await checkPhoneUniqueness(queryNum);
+        const res = await checkPhoneUniqueness(queryNum, editingMember?.id);
         setIsDuplicate(res.exists);
         if (res.exists) {
           setErrorMsg(`Phone number (${whatsappPhone}) is already registered in the fellowship records!`);
@@ -100,15 +179,29 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [whatsappPhone]);
+  }, [whatsappPhone, editingMember]);
 
   if (!isOpen) return null;
+
+  const pinIsValid = isEditMode
+    ? (editPin.trim() === '' || /^\d{4}$/.test(editPin.trim()))
+    : /^\d{4}$/.test(editPin.trim());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalOccupation = occupation === 'Other' ? (customOccupation.trim() || 'Other') : occupation;
     if (!firstName || !lastName || !finalOccupation || !whatsappPhone || !dobMonth || !dobDay) {
       setErrorMsg('Please fill in all mandatory fields including Date of Birth (Month & Day).');
+      return;
+    }
+
+    if (!isEditMode && !/^\d{4}$/.test(editPin.trim())) {
+      setErrorMsg('Please choose a 4-digit Edit PIN so you can safely edit your profile later.');
+      return;
+    }
+
+    if (isEditMode && editPin.trim() !== '' && !/^\d{4}$/.test(editPin.trim())) {
+      setErrorMsg('New Edit PIN must be exactly 4 digits.');
       return;
     }
 
@@ -137,7 +230,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
 
     try {
       const dob = `${dobDay} ${dobMonth}`;
-      const newMember = await createMember({
+      const basePayload = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         occupation: finalOccupation,
@@ -146,13 +239,31 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
         altPhone: altPhone.trim() ? (validatePhoneNumber(altPhone).normalized || altPhone.trim()) : undefined,
         dob,
         dom: dob,
-      });
+      };
 
-      onMemberAdded(newMember);
+      if (isEditMode && editingMember) {
+        const updated = await updateMember(
+          editingMember.id,
+          {
+            ...basePayload,
+            editPin: verifiedEditPin,
+            newEditPin: editPin.trim() || undefined
+          },
+          isAdmin && passcode ? passcode : undefined
+        );
+        onMemberUpdated?.(updated);
+      } else {
+        const newMember = await createMember({
+          ...basePayload,
+          editPin: editPin.trim()
+        });
+        onMemberAdded(newMember);
+      }
+
       resetForm();
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'An error occurred while saving to Excel database.');
+      setErrorMsg(err.message || 'An error occurred while saving to database.');
     } finally {
       setSubmitting(false);
     }
@@ -170,6 +281,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
     setAltPhone('');
     setDobMonth('');
     setDobDay('');
+    setEditPin('');
+    setShowPin(false);
     setIsDuplicate(null);
     setErrorMsg(null);
   };
@@ -194,7 +307,9 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <ShieldCheck color="var(--accent-teal)" size={24} />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>Add Fellowship Member Record</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              {isEditMode ? `Edit Profile: ${editingMember?.firstName} ${editingMember?.lastName}` : 'Add Fellowship Member Record'}
+            </h2>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
             <X size={22} />
@@ -524,6 +639,59 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
             </p>
           </div>
 
+          {/* 4-Digit Edit PIN */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label className="input-label" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <KeyRound size={14} color="var(--accent-teal)" />
+                {isEditMode
+                  ? (editingMember?.hasEditPin ? 'Change 4-Digit Edit PIN (Optional)' : 'Assign 4-Digit Edit PIN (Optional)')
+                  : '4-Digit Profile Edit PIN *'}
+              </label>
+              {!isEditMode && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--accent-teal)', fontWeight: 700 }}>Protects Your Edits</span>
+              )}
+            </div>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPin ? 'text' : 'password'}
+                inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={4}
+                className="input-field"
+                placeholder={isEditMode ? 'Leave blank to keep current PIN' : 'e.g. 4829'}
+                value={editPin}
+                onChange={(e) => setEditPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                style={{ paddingRight: '40px', letterSpacing: editPin ? (showPin ? '0.2em' : '0.3em') : undefined }}
+                required={!isEditMode}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPin(!showPin)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer'
+                }}
+                title={showPin ? 'Hide PIN' : 'Show PIN'}
+              >
+                {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              {isEditMode
+                ? (editingMember?.hasEditPin
+                    ? 'Leave blank to keep the existing PIN, or enter 4 digits to update it.'
+                    : 'Assign a 4-digit PIN so this member can edit their own profile in the future.')
+                : 'Remember this 4-digit PIN — you will use it whenever you want to edit your own profile.'}
+            </p>
+          </div>
+
           {/* Actions */}
           <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
             <button type="button" onClick={onClose} className="btn-secondary" style={{ flex: 1 }}>
@@ -538,15 +706,16 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({ isOpen, onClos
                 !phoneValidation.isValid ||
                 (altPhone.trim().length > 0 && !altValidation.isValid) ||
                 !dobMonth ||
-                !dobDay
+                !dobDay ||
+                !pinIsValid
               }
               className="btn-primary"
               style={{
                 flex: 1,
-                opacity: (submitting || isDuplicate === true || phoneChecking || !phoneValidation.isValid || (altPhone.trim().length > 0 && !altValidation.isValid) || !dobMonth || !dobDay) ? 0.6 : 1
+                opacity: (submitting || isDuplicate === true || phoneChecking || !phoneValidation.isValid || (altPhone.trim().length > 0 && !altValidation.isValid) || !dobMonth || !dobDay || !pinIsValid) ? 0.6 : 1
               }}
             >
-              {submitting ? 'Saving to Excel...' : 'Save Member Record'}
+              {submitting ? 'Saving...' : (isEditMode ? 'Save Profile Changes' : 'Save Member Record')}
             </button>
           </div>
 

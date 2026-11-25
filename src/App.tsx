@@ -7,6 +7,7 @@ import { ExcelAdmin } from './components/ExcelAdmin';
 import { EventsView } from './components/EventsView';
 import { ExcoMembers } from './components/ExcoMembers';
 import { MemberFormModal } from './components/MemberFormModal';
+import { EditPinModal } from './components/EditPinModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminQRCodeModal } from './components/AdminQRCodeModal';
 import { Member, ShowcasePost, ExcelStats } from './types';
@@ -34,6 +35,9 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [toastNotice, setToastNotice] = useState<string | null>(null);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [pinTargetMember, setPinTargetMember] = useState<Member | null>(null);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [verifiedEditPin, setVerifiedEditPin] = useState<string | undefined>(undefined);
 
   const loadData = useCallback(async (mode: 'initial' | 'manual' | 'background' = 'background') => {
     if (isFetchingRef.current) return;
@@ -181,6 +185,30 @@ export function App() {
   const handleMemberAdded = (newMember: Member) => {
     setMembers([newMember, ...members]);
     setToastNotice(`Fellowship member "${newMember.firstName} ${newMember.lastName}" registered successfully!`);
+    loadData();
+    setTimeout(() => setToastNotice(null), 6000);
+  };
+
+  const handleRequestEditMember = (member: Member) => {
+    if (isAdmin && passcode) {
+      setEditingMember(member);
+      setVerifiedEditPin(undefined);
+      setIsRegisterModalOpen(true);
+    } else {
+      setPinTargetMember(member);
+    }
+  };
+
+  const handlePinVerifiedForEdit = (member: Member, pin: string) => {
+    setPinTargetMember(null);
+    setEditingMember(member);
+    setVerifiedEditPin(pin);
+    setIsRegisterModalOpen(true);
+  };
+
+  const handleMemberUpdated = (updatedMember: Member) => {
+    setMembers((prev) => prev.map((m) => (m.id === updatedMember.id ? updatedMember : m)));
+    setToastNotice(`Profile for "${updatedMember.firstName} ${updatedMember.lastName}" updated successfully!`);
     loadData();
     setTimeout(() => setToastNotice(null), 6000);
   };
@@ -355,7 +383,11 @@ export function App() {
             </button>
 
             <button
-              onClick={() => setIsRegisterModalOpen(true)}
+              onClick={() => {
+                setEditingMember(null);
+                setVerifiedEditPin(undefined);
+                setIsRegisterModalOpen(true);
+              }}
               className="btn-primary btn-gold"
               style={{ padding: '9px 18px', fontSize: '0.88rem' }}
             >
@@ -443,8 +475,13 @@ export function App() {
             <MemberDirectory
               members={validMembers}
               loading={loading}
+              onEditMember={handleRequestEditMember}
               onDeleteMember={handleDeleteMember}
-              onOpenRegisterModal={() => setIsRegisterModalOpen(true)}
+              onOpenRegisterModal={() => {
+                setEditingMember(null);
+                setVerifiedEditPin(undefined);
+                setIsRegisterModalOpen(true);
+              }}
             />
           )}
 
@@ -475,11 +512,25 @@ export function App() {
 
         </main>
 
-        {/* Register Member Form Modal */}
+        {/* Register / Edit Member Form Modal */}
         <MemberFormModal
           isOpen={isRegisterModalOpen}
-          onClose={() => setIsRegisterModalOpen(false)}
+          onClose={() => {
+            setIsRegisterModalOpen(false);
+            setEditingMember(null);
+            setVerifiedEditPin(undefined);
+          }}
           onMemberAdded={handleMemberAdded}
+          editingMember={editingMember}
+          verifiedEditPin={verifiedEditPin}
+          onMemberUpdated={handleMemberUpdated}
+        />
+
+        {/* Verify 4-Digit Edit PIN Modal */}
+        <EditPinModal
+          member={pinTargetMember}
+          onClose={() => setPinTargetMember(null)}
+          onVerified={handlePinVerifiedForEdit}
         />
 
         {/* EXCO Admin Authentication Modal */}

@@ -1,4 +1,4 @@
-import { Member, ShowcasePost, ShowcaseComment, BackendStats, ExcoMember, FellowshipEvent } from '../types';
+import { Member, ShowcasePost, ShowcaseComment, BackendStats, ExcoMember, FellowshipEvent, TodayBirthdaysResponse } from '../types';
 import { INITIAL_EXCOS, DEFAULT_EVENTS } from '../constants/excos';
 
 const API_BASE = '/api';
@@ -26,9 +26,10 @@ export async function fetchMembers(): Promise<Member[]> {
   return [];
 }
 
-export async function checkPhoneUniqueness(phone: string): Promise<{ exists: boolean }> {
+export async function checkPhoneUniqueness(phone: string, excludeId?: string): Promise<{ exists: boolean }> {
   try {
-    const res = await fetch(`${API_BASE}/members/check-phone?phone=${encodeURIComponent(phone)}`);
+    const excludeParam = excludeId ? `&excludeId=${encodeURIComponent(excludeId)}` : '';
+    const res = await fetch(`${API_BASE}/members/check-phone?phone=${encodeURIComponent(phone)}${excludeParam}`);
     if (res.ok) {
       return await res.json();
     }
@@ -38,7 +39,7 @@ export async function checkPhoneUniqueness(phone: string): Promise<{ exists: boo
   return { exists: false };
 }
 
-export async function createMember(member: Omit<Member, 'id' | 'createdAt'>): Promise<Member> {
+export async function createMember(member: Omit<Member, 'id' | 'createdAt' | 'hasEditPin'> & { editPin: string }): Promise<Member> {
   const res = await fetch(`${API_BASE}/members`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -48,6 +49,50 @@ export async function createMember(member: Omit<Member, 'id' | 'createdAt'>): Pr
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data.error || 'Failed to add member to database');
+  }
+  return data;
+}
+
+export async function verifyMemberEditPin(
+  id: string,
+  editPin: string,
+  passcode?: string
+): Promise<{ verified: boolean; mode?: string }> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (passcode) headers['x-admin-passcode'] = passcode;
+
+  const res = await fetch(`${API_BASE}/members/${encodeURIComponent(id)}/verify-pin`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ editPin }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || 'PIN verification failed');
+    (err as any).requiresAdmin = Boolean(data.requiresAdmin);
+    throw err;
+  }
+  return data;
+}
+
+export async function updateMember(
+  id: string,
+  member: Omit<Member, 'id' | 'createdAt' | 'hasEditPin'> & { editPin?: string; newEditPin?: string },
+  passcode?: string
+): Promise<Member> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (passcode) headers['x-admin-passcode'] = passcode;
+
+  const res = await fetch(`${API_BASE}/members/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(member),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update member profile');
   }
   return data;
 }
@@ -313,4 +358,38 @@ export async function deleteEvent(id: string, passcode: string): Promise<void> {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || 'Failed to delete event. Admin privileges required.');
   }
+}
+
+// ----------------- BIRTHDAY ALERTS APIS -----------------
+
+export async function fetchTodayBirthdays(passcode?: string): Promise<TodayBirthdaysResponse> {
+  const headers: Record<string, string> = {};
+  if (passcode) headers['x-admin-passcode'] = passcode;
+
+  const res = await fetch(`${API_BASE}/birthdays/today`, { headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to check today birthdays');
+  }
+  return data;
+}
+
+export async function triggerBirthdayAlerts(
+  passcode: string,
+  options: { dryRun?: boolean; force?: boolean } = {}
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/birthdays/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-admin-passcode': passcode
+    },
+    body: JSON.stringify(options)
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to run birthday alerts');
+  }
+  return data;
 }

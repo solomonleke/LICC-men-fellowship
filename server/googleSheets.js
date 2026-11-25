@@ -1,8 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import { INITIAL_EXCOS, isDummyMember, isDummyShowcase } from './excelDatabase.js';
+import { sanitizeMemberForClient } from './pinSecurity.js';
 
-const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwvQgCBSDiYmqUs_RY1U-XrsSsvEkh_bCC2YCWhYhe5Df0XNOi3zzdd9HiN1O_0Elpxxw/exec';
+const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbz3qNfHk9ByVUXZunCQgv_WlYlBrP6omExvFUtLPDOPJBixMrJx-hsaWXHy0dG5V_YZ7w/exec';
 const DEFAULT_SHEETS_TOKEN = 'licc-fellowship-2026-secret-key';
 
 let config = {
@@ -129,9 +130,9 @@ async function callScriptDeduplicated(payload) {
 
 // ----------------- MEMBERS -----------------
 
-export async function getMembersFromSheet() {
+export async function getRawMembersFromSheet({ bypassCache = false } = {}) {
   const now = Date.now();
-  if (cache.members.data && (now - cache.members.timestamp < CACHE_TTL_MS)) {
+  if (!bypassCache && cache.members.data && (now - cache.members.timestamp < CACHE_TTL_MS)) {
     return cache.members.data;
   }
 
@@ -149,10 +150,12 @@ export async function getMembersFromSheet() {
       })
       .map(m => {
         const dobVal = m.dob || m.dom ? String(m.dob || m.dom).trim() : '';
+        const editPinHash = String(m.editPinHash || '').trim();
         return {
           ...m,
           dob: dobVal,
-          dom: dobVal || undefined
+          dom: dobVal || undefined,
+          editPinHash
         };
       })
       .reverse();
@@ -170,17 +173,30 @@ export async function getMembersFromSheet() {
   }
 }
 
-export async function checkPhoneInSheet(phone) {
+export async function getMembersFromSheet() {
+  const raw = await getRawMembersFromSheet();
+  return raw.map(sanitizeMemberForClient);
+}
+
+export async function getRawMemberByIdFromSheet(id) {
+  const members = await getRawMembersFromSheet({ bypassCache: true });
+  return members.find(m => m.id === String(id).trim()) || null;
+}
+
+export async function checkPhoneInSheet(phone, excludeId = null) {
   const members = await getMembersFromSheet();
   const digits = String(phone || '').replace(/\D/g, '');
   if (!digits) return false;
-  return members.some(m => String(m.whatsappPhone || '').replace(/\D/g, '') === digits);
+  return members.some(m => {
+    if (excludeId && m.id === String(excludeId).trim()) return false;
+    return String(m.whatsappPhone || '').replace(/\D/g, '') === digits;
+  });
 }
 
 export async function addMemberToSheet(data) {
   const dobVal = String(data.dob || data.dom || '').trim();
   const newMember = {
-    id: `MEM-${Date.now().toString().slice(-6)}`,
+    id: data.id || `MEM-${Date.now().toString().slice(-6)}`,
     firstName: data.firstName.trim(),
     lastName: data.lastName.trim(),
     occupation: data.occupation.trim(),
@@ -189,7 +205,8 @@ export async function addMemberToSheet(data) {
     altPhone: data.altPhone ? data.altPhone.trim() : '',
     dob: dobVal,
     dom: dobVal,
-    createdAt: new Date().toISOString()
+    createdAt: data.createdAt || new Date().toISOString(),
+    editPinHash: data.editPinHash ? String(data.editPinHash).trim() : ''
   };
 
   try {
@@ -201,10 +218,45 @@ export async function addMemberToSheet(data) {
     });
     // Invalidate member cache so subsequent fetches get fresh data
     invalidateCache('members');
-    return newMember;
+    return sanitizeMemberForClient(newMember);
   } catch (err) {
     if (err.message === 'DUPLICATE_PHONE') {
       throw new Error(`Duplicate entry! WhatsApp number (${data.whatsappPhone}) already exists in Google Sheets.`);
+    }
+    throw err;
+  }
+}
+
+export async function updateMemberInSheet(id, data) {
+  const dobVal = String(data.dob || data.dom || '').trim();
+  const record = {
+    firstName: data.firstName.trim(),
+    lastName: data.lastName.trim(),
+    occupation: data.occupation.trim(),
+    ageGroup: data.ageGroup,
+    whatsappPhone: data.whatsappPhone.trim(),
+    altPhone: data.altPhone ? data.altPhone.trim() : '',
+    dob: dobVal,
+    dom: dobVal
+  };
+
+  if (data.editPinHash !== undefined) {
+    record.editPinHash = String(data.editPinHash || '').trim();
+  }
+
+  try {
+    const updated = await callScript({
+      sheet: 'Members',
+      action: 'update',
+      id: String(id).trim(),
+      record,
+      uniqueField: 'whatsappPhone'
+    });
+    invalidateCache('members');
+    return sanitizeMemberForClient(updated);
+  } catch (err) {
+    if (err.message === 'DUPLICATE_PHONE') {
+      throw new Error(`Duplicate entry! WhatsApp number (${data.whatsappPhone}) already belongs to another member in Google Sheets.`);
     }
     throw err;
   }
@@ -368,8 +420,27 @@ export async function getExcosFromSheet() {
   try {
     const excos = await callScriptDeduplicated({ sheet: 'Excos', action: 'list' });
     if (excos && Array.isArray(excos) && excos.length > 0) {
-      const sorted = excos
+      const filtered = excos
         .filter(ex => ex.name && ex.role)
+        .map(ex => {
+          const rawAlert = String(ex.birthdayAlert ?? '').trim().toUpperCase();
+          const explicitAlert = rawAlert
+            ? (['YES', 'TRUE', '1', 'Y', 'ON'].includes(rawAlert) ? true : (['NO', 'FALSE', '0', 'N', 'OFF'].includes(rawAlert) ? false : null))
+            : null;
+          return {
+            ...ex,
+            _explicitAlert: explicitAlert
+          };
+        });
+
+      const hasExplicit = filtered.some(ex => ex._explicitAlert !== null);
+      const sorted = filtered
+        .map(({ _explicitAlert, ...ex }) => ({
+          ...ex,
+          birthdayAlert: hasExplicit
+            ? _explicitAlert === true
+            : ['EXCO-3', 'EXCO-4', 'EXCO-5'].includes(String(ex.id || '').trim().toUpperCase())
+        }))
         .sort((a, b) => Number(a.order || 99) - Number(b.order || 99));
       if (sorted.length > 0) {
         cache.excos.data = sorted;
@@ -436,4 +507,18 @@ export async function deleteEventFromSheet(id) {
   await callScript({ sheet: 'Events', action: 'delete', id });
   invalidateCache('events');
   return true;
+}
+
+// ----------------- BIRTHDAY ALERTS (APPS SCRIPT CRON) -----------------
+
+export async function checkBirthdaysInSheet() {
+  return callScript({ action: 'checkBirthdays' });
+}
+
+export async function triggerBirthdayAlertsInSheet({ dryRun = false, force = false } = {}) {
+  return callScript({
+    action: 'runBirthdayAlerts',
+    dryRun: Boolean(dryRun),
+    force: Boolean(force)
+  });
 }

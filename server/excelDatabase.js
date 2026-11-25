@@ -53,7 +53,8 @@ const COLUMN_POSITIONS = {
     altphone: 7,
     dob: 8,
     dom: 8,
-    createdat: 9
+    createdat: 9,
+    editpinhash: 10
   },
   Showcases: {
     id: 1,
@@ -93,7 +94,8 @@ const COLUMN_POSITIONS = {
     phone: 4,
     email: 5,
     portfolio: 6,
-    order: 7
+    order: 7,
+    birthdayalert: 8
   }
 };
 
@@ -197,7 +199,8 @@ export async function getWorkbook() {
     { header: 'WhatsApp Phone', key: 'whatsappPhone', width: 20 },
     { header: 'Alt Phone', key: 'altPhone', width: 20 },
     { header: 'DOB', key: 'dob', width: 16 },
-    { header: 'Created At', key: 'createdAt', width: 24 }
+    { header: 'Created At', key: 'createdAt', width: 24 },
+    { header: 'Edit PIN Hash', key: 'editPinHash', width: 32 }
   ];
 
   const showcasesSheet = workbook.getWorksheet('Showcases') || createShowcasesSheet(workbook);
@@ -236,7 +239,8 @@ export async function getWorkbook() {
     { header: 'Phone', key: 'phone', width: 20 },
     { header: 'Email', key: 'email', width: 25 },
     { header: 'Portfolio', key: 'portfolio', width: 45 },
-    { header: 'Display Order', key: 'order', width: 15 }
+    { header: 'Display Order', key: 'order', width: 15 },
+    { header: 'Birthday Alert', key: 'birthdayAlert', width: 16 }
   ];
 
   let sChanged = false;
@@ -247,7 +251,10 @@ export async function getWorkbook() {
     if (rowNumber > 1) excosCount++;
   });
   if (excosCount === 0) {
-    INITIAL_EXCOS.forEach(ex => excosSheet.addRow(ex));
+    INITIAL_EXCOS.forEach(ex => excosSheet.addRow({
+      ...ex,
+      birthdayAlert: ex.birthdayAlert ? 'YES' : 'NO'
+    }));
     sChanged = true;
   }
 
@@ -319,7 +326,8 @@ function createMembersSheet(workbook) {
     { header: 'WhatsApp Phone', key: 'whatsappPhone', width: 20 },
     { header: 'Alt Phone', key: 'altPhone', width: 20 },
     { header: 'DOB', key: 'dob', width: 16 },
-    { header: 'Created At', key: 'createdAt', width: 24 }
+    { header: 'Created At', key: 'createdAt', width: 24 },
+    { header: 'Edit PIN Hash', key: 'editPinHash', width: 32 }
   ];
   styleHeaderRow(sheet);
   return sheet;
@@ -383,19 +391,20 @@ function createExcosSheet(workbook) {
     { header: 'Phone', key: 'phone', width: 20 },
     { header: 'Email', key: 'email', width: 25 },
     { header: 'Portfolio', key: 'portfolio', width: 45 },
-    { header: 'Display Order', key: 'order', width: 15 }
+    { header: 'Display Order', key: 'order', width: 15 },
+    { header: 'Birthday Alert', key: 'birthdayAlert', width: 16 }
   ];
   styleHeaderRow(sheet);
   return sheet;
 }
 
 export const INITIAL_EXCOS = [
-  { id: 'EXCO-1', role: 'PRESIDENT', name: 'Prof. Tolu Ososanya', phone: '+2348033333331', email: '', portfolio: 'Overall Leadership, Fellowship Vision & Spiritual Oversight', order: 1 },
-  { id: 'EXCO-2', role: 'VICE PRESIDENT', name: 'Bro Feyi Ijimakinwa', phone: '+2348033333332', email: '', portfolio: 'Programs, Strategy & Executive Coordination', order: 2 },
-  { id: 'EXCO-3', role: 'GENERAL SECRETARY', name: 'Dr Damola Oyejobi', phone: '+2348033333333', email: '', portfolio: 'Administration, Documentation, Records & Communications', order: 3 },
-  { id: 'EXCO-4', role: 'ASST. GEN. SEC.', name: 'Bro Solomon Adeleke', phone: '+2348165413812', email: '', portfolio: 'Secretariat, Digital Systems & Data Operations', order: 4 },
-  { id: 'EXCO-5', role: 'SOCIAL SECRETARY', name: 'Bro Oluwatobi Oduntan', phone: '+2348033333335', email: '', portfolio: 'Welfare, Socials, Fellowship Hospitality & Events Logistics', order: 5 },
-  { id: 'EXCO-6', role: 'FINANCIAL SEC', name: 'Bro Tayo Olayinka', phone: '+2348033333336', email: '', portfolio: 'Financial Records, Accounts, Dues & Treasury Oversight', order: 6 },
+  { id: 'EXCO-1', role: 'PRESIDENT', name: 'Prof. Tolu Ososanya', phone: '+2348033333331', email: '', portfolio: 'Overall Leadership, Fellowship Vision & Spiritual Oversight', order: 1, birthdayAlert: false },
+  { id: 'EXCO-2', role: 'VICE PRESIDENT', name: 'Bro Feyi Ijimakinwa', phone: '+2348033333332', email: '', portfolio: 'Programs, Strategy & Executive Coordination', order: 2, birthdayAlert: false },
+  { id: 'EXCO-3', role: 'GENERAL SECRETARY', name: 'Dr Damola Oyejobi', phone: '+2348033333333', email: '', portfolio: 'Administration, Documentation, Records & Communications', order: 3, birthdayAlert: true },
+  { id: 'EXCO-4', role: 'ASST. GEN. SEC.', name: 'Bro Solomon Adeleke', phone: '+2348165413812', email: '', portfolio: 'Secretariat, Digital Systems & Data Operations', order: 4, birthdayAlert: true },
+  { id: 'EXCO-5', role: 'SOCIAL SECRETARY', name: 'Bro Oluwatobi Oduntan', phone: '+2348033333335', email: '', portfolio: 'Welfare, Socials, Fellowship Hospitality & Events Logistics', order: 5, birthdayAlert: true },
+  { id: 'EXCO-6', role: 'FINANCIAL SEC', name: 'Bro Tayo Olayinka', phone: '+2348033333336', email: '', portfolio: 'Financial Records, Accounts, Dues & Treasury Oversight', order: 6, birthdayAlert: false },
 ];
 
 async function seedInitialData(workbook) {
@@ -404,7 +413,7 @@ async function seedInitialData(workbook) {
 
 // ----------------- MEMBER OPERATIONS -----------------
 
-export async function checkPhoneExists(whatsappPhone) {
+export async function checkPhoneExists(whatsappPhone, excludeId = null) {
   const workbook = await getWorkbook();
   const sheet = workbook.getWorksheet('Members');
   const targetNormalized = normalizePhone(whatsappPhone);
@@ -412,6 +421,8 @@ export async function checkPhoneExists(whatsappPhone) {
   let exists = false;
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return; // Skip header
+    const rowId = String(getVal(row, sheet, 'id') || '').trim();
+    if (excludeId && rowId === String(excludeId).trim()) return;
     const phoneInCell = getVal(row, sheet, 'whatsappPhone');
     if (phoneInCell && normalizePhone(String(phoneInCell)) === targetNormalized) {
       exists = true;
@@ -421,7 +432,7 @@ export async function checkPhoneExists(whatsappPhone) {
   return exists;
 }
 
-export async function getAllMembers() {
+export async function getRawMembers() {
   try {
     const workbook = await getWorkbook();
     const sheet = workbook.getWorksheet('Members');
@@ -439,6 +450,7 @@ export async function getAllMembers() {
       const altPhone = String(getVal(row, sheet, 'altPhone') || '').trim();
       const dobVal = String(getVal(row, sheet, 'dob') || getVal(row, sheet, 'dom') || '').trim();
       const createdAt = String(getVal(row, sheet, 'createdAt') || '').trim();
+      const editPinHash = String(getVal(row, sheet, 'editPinHash') || '').trim();
 
       // Must have at least a first name, last name, or phone number to be considered a real record
       if (!firstName && !lastName && !whatsappPhone) return;
@@ -456,15 +468,29 @@ export async function getAllMembers() {
         altPhone,
         dob: dobVal,
         dom: dobVal || undefined,
-        createdAt
+        createdAt,
+        editPinHash
       });
     });
 
     return members.reverse(); // Most recent first
   } catch (err) {
-    console.error('getAllMembers error:', err);
+    console.error('getRawMembers error:', err);
     return [];
   }
+}
+
+export async function getRawMemberById(id) {
+  const members = await getRawMembers();
+  return members.find(m => m.id === String(id).trim()) || null;
+}
+
+export async function getAllMembers() {
+  const raw = await getRawMembers();
+  return raw.map(({ editPinHash, ...rest }) => ({
+    ...rest,
+    hasEditPin: Boolean(editPinHash)
+  }));
 }
 
 export async function addMember(data) {
@@ -487,7 +513,7 @@ export async function addMember(data) {
   const sheet = workbook.getWorksheet('Members');
 
   const newMember = {
-    id: `MEM-${Date.now().toString().slice(-6)}`,
+    id: data.id || `MEM-${Date.now().toString().slice(-6)}`,
     firstName: data.firstName.trim(),
     lastName: data.lastName.trim(),
     occupation: data.occupation.trim(),
@@ -496,12 +522,81 @@ export async function addMember(data) {
     altPhone: data.altPhone ? normalizePhone(data.altPhone) : '',
     dob: dobVal,
     dom: dobVal,
-    createdAt: new Date().toISOString()
+    createdAt: data.createdAt || new Date().toISOString(),
+    editPinHash: data.editPinHash ? String(data.editPinHash).trim() : ''
   };
 
   sheet.addRow(newMember);
   await saveWorkbookToFile(workbook);
-  return newMember;
+  const { editPinHash, ...publicMember } = newMember;
+  return {
+    ...publicMember,
+    hasEditPin: Boolean(editPinHash)
+  };
+}
+
+export async function updateMember(id, data) {
+  const normalizedPhone = normalizePhone(data.whatsappPhone);
+  if (!normalizedPhone) {
+    throw new Error('Primary WhatsApp Phone Number is required.');
+  }
+
+  const dobVal = String(data.dob || data.dom || '').trim();
+  if (!dobVal) {
+    throw new Error('Date of Birth (DOB) is compulsory.');
+  }
+
+  const phoneExists = await checkPhoneExists(normalizedPhone, id);
+  if (phoneExists) {
+    throw new Error(`Duplicate entry! Another member with WhatsApp number (${data.whatsappPhone}) already exists in the Excel database.`);
+  }
+
+  const workbook = await getWorkbook();
+  const sheet = workbook.getWorksheet('Members');
+  let targetRow = null;
+
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    if (String(getVal(row, sheet, 'id') || '').trim() === String(id).trim()) {
+      targetRow = row;
+    }
+  });
+
+  if (!targetRow) {
+    return null;
+  }
+
+  const existingCreatedAt = String(getVal(targetRow, sheet, 'createdAt') || '').trim();
+  const existingPinHash = String(getVal(targetRow, sheet, 'editPinHash') || '').trim();
+  const nextPinHash = data.editPinHash !== undefined ? String(data.editPinHash || '').trim() : existingPinHash;
+
+  const updated = {
+    id: String(id).trim(),
+    firstName: data.firstName.trim(),
+    lastName: data.lastName.trim(),
+    occupation: data.occupation.trim(),
+    ageGroup: data.ageGroup,
+    whatsappPhone: normalizedPhone,
+    altPhone: data.altPhone ? normalizePhone(data.altPhone) : '',
+    dob: dobVal,
+    dom: dobVal,
+    createdAt: existingCreatedAt
+  };
+
+  setVal(targetRow, sheet, 'firstName', updated.firstName);
+  setVal(targetRow, sheet, 'lastName', updated.lastName);
+  setVal(targetRow, sheet, 'occupation', updated.occupation);
+  setVal(targetRow, sheet, 'ageGroup', updated.ageGroup);
+  setVal(targetRow, sheet, 'whatsappPhone', updated.whatsappPhone);
+  setVal(targetRow, sheet, 'altPhone', updated.altPhone);
+  setVal(targetRow, sheet, 'dob', updated.dob);
+  setVal(targetRow, sheet, 'editPinHash', nextPinHash);
+
+  await saveWorkbookToFile(workbook);
+  return {
+    ...updated,
+    hasEditPin: Boolean(nextPinHash)
+  };
 }
 
 export async function deleteMember(id) {
@@ -704,18 +799,36 @@ export async function getAllExcos() {
     if (rowNumber === 1) return;
     const name = String(getVal(row, sheet, 'name') || '').trim();
     if (!name) return;
+    const id = String(getVal(row, sheet, 'id') || `EXCO-${rowNumber}`);
+    const role = String(getVal(row, sheet, 'role') || '');
+    const rawAlert = String(getVal(row, sheet, 'birthdayAlert') || '').trim().toUpperCase();
+    const explicitAlert = rawAlert
+      ? (['YES', 'TRUE', '1', 'Y', 'ON'].includes(rawAlert) ? true : (['NO', 'FALSE', '0', 'N', 'OFF'].includes(rawAlert) ? false : null))
+      : null;
+
     excos.push({
-      id: String(getVal(row, sheet, 'id') || `EXCO-${rowNumber}`),
-      role: String(getVal(row, sheet, 'role') || ''),
+      id,
+      role,
       name,
       phone: String(getVal(row, sheet, 'phone') || ''),
       email: String(getVal(row, sheet, 'email') || ''),
       portfolio: String(getVal(row, sheet, 'portfolio') || ''),
-      order: Number(getVal(row, sheet, 'order') || rowNumber)
+      order: Number(getVal(row, sheet, 'order') || rowNumber),
+      _explicitAlert: explicitAlert
     });
   });
 
-  return excos.length > 0 ? excos.sort((a, b) => a.order - b.order) : INITIAL_EXCOS;
+  if (excos.length === 0) return INITIAL_EXCOS;
+
+  const hasExplicit = excos.some(ex => ex._explicitAlert !== null);
+  return excos
+    .map(({ _explicitAlert, ...ex }) => ({
+      ...ex,
+      birthdayAlert: hasExplicit
+        ? _explicitAlert === true
+        : ['EXCO-3', 'EXCO-4', 'EXCO-5'].includes(String(ex.id || '').trim().toUpperCase())
+    }))
+    .sort((a, b) => a.order - b.order);
 }
 
 // ----------------- EVENT OPERATIONS -----------------

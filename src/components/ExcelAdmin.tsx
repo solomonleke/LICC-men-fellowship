@@ -14,10 +14,15 @@ import {
   Link,
   ShieldCheck,
   QrCode,
-  Printer
+  Printer,
+  Cake,
+  Bell,
+  Send,
+  AlertTriangle
 } from 'lucide-react';
-import { BackendStats, AgeGroup } from '../types';
-import { getExcelDownloadUrl, fetchSheetsConfig, saveSheetsConfig, testSheetsUrl } from '../services/api';
+import { BackendStats, AgeGroup, TodayBirthdaysResponse } from '../types';
+import { getExcelDownloadUrl, fetchSheetsConfig, saveSheetsConfig, testSheetsUrl, fetchTodayBirthdays, triggerBirthdayAlerts } from '../services/api';
+import { useAdmin } from '../context/AdminContext';
 import { QRCode } from '../utils/qrGenerator';
 import { AdminQRCodeModal } from './AdminQRCodeModal';
 
@@ -28,6 +33,7 @@ interface ExcelAdminProps {
 }
 
 export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats, onOpenQRModal }) => {
+  const { isAdmin, passcode, openLoginModal } = useAdmin();
   const ageGroupsList: AgeGroup[] = ['18-29', '30-39', '40-49', '50-59', '60 and above'];
 
   const [sheetsUrl, setSheetsUrl] = useState('');
@@ -39,6 +45,12 @@ export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats, o
   const [showGuide, setShowGuide] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
+  // Birthday Cron State
+  const [birthdayPreview, setBirthdayPreview] = useState<TodayBirthdaysResponse | null>(null);
+  const [loadingBirthdays, setLoadingBirthdays] = useState(false);
+  const [runningAlerts, setRunningAlerts] = useState(false);
+  const [birthdayMsg, setBirthdayMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+
   // QR Code State
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [copiedShortlink, setCopiedShortlink] = useState(false);
@@ -49,6 +61,10 @@ export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats, o
     loadConfig();
   }, []);
 
+  useEffect(() => {
+    loadBirthdayPreview();
+  }, [passcode]);
+
   const loadConfig = async () => {
     try {
       const cfg = await fetchSheetsConfig();
@@ -56,6 +72,57 @@ export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats, o
       if (cfg.url) setSheetsUrl(cfg.url);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const loadBirthdayPreview = async () => {
+    setLoadingBirthdays(true);
+    try {
+      const data = await fetchTodayBirthdays(passcode || undefined);
+      setBirthdayPreview(data);
+    } catch (err) {
+      console.warn('Could not load birthday preview:', err);
+    } finally {
+      setLoadingBirthdays(false);
+    }
+  };
+
+  const handleRunBirthdayCheck = async (dryRun: boolean) => {
+    if (!isAdmin || !passcode) {
+      openLoginModal();
+      return;
+    }
+
+    setRunningAlerts(true);
+    setBirthdayMsg(null);
+    try {
+      const res = await triggerBirthdayAlerts(passcode, { dryRun });
+      await loadBirthdayPreview();
+      if (dryRun) {
+        const count = res?.birthdayMembers?.length || 0;
+        const recips = res?.alertExcos?.length || 0;
+        setBirthdayMsg({
+          type: 'info',
+          text: res?.warning || `Dry run complete (${res?.date || 'today'}): ${count} birthday celebrant(s) matched, ${recips} EXCO recipient(s) configured.`
+        });
+      } else {
+        const counts = res?.counts || {};
+        if (counts.celebrants === 0) {
+          setBirthdayMsg({ type: 'info', text: `Checked ${res?.date || 'today'}: No fellowship member birthdays today.` });
+        } else if (counts.failed > 0 && counts.sent === 0) {
+          const firstErr = res?.results?.find((r: any) => r.error)?.error || 'Check Google Apps Script MailApp authorization and EXCO Gmail addresses.';
+          setBirthdayMsg({ type: 'error', text: `Alert check finished with ${counts.failed} failure(s): ${firstErr}` });
+        } else {
+          setBirthdayMsg({
+            type: counts.failed > 0 ? 'info' : 'success',
+            text: `Sent: ${counts.sent || 0} • Already Sent Today: ${counts.skippedAlreadySent || 0} • Skipped Missing Email: ${counts.skippedMissingEmail || 0} • Failed: ${counts.failed || 0}`
+          });
+        }
+      }
+    } catch (err: any) {
+      setBirthdayMsg({ type: 'error', text: err.message || 'Failed to run birthday check.' });
+    } finally {
+      setRunningAlerts(false);
     }
   };
 
@@ -521,6 +588,155 @@ export const ExcelAdmin: React.FC<ExcelAdminProps> = ({ stats, onRefreshStats, o
           </div>
         </form>
 
+      </div>
+
+      {/* Daily Birthday WhatsApp Cron Card */}
+      <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(245, 158, 11, 0.35)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '16px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: 'rgba(245, 158, 11, 0.16)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--accent-gold)'
+            }}>
+              <Cake size={22} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                Daily Birthday Gmail Alerts
+                <span className="badge badge-gold" style={{ textTransform: 'none' }}>7:00 AM WAT • Apps Script</span>
+              </h3>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                Checks member birthdays daily in Google Sheets and sends Gmail reminders directly to designated EXCO officers.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadBirthdayPreview}
+            disabled={loadingBirthdays}
+            className="btn-secondary"
+            style={{ fontSize: '0.82rem', padding: '8px 14px' }}
+          >
+            <RefreshCw size={14} className={loadingBirthdays ? 'spin' : ''} /> {loadingBirthdays ? 'Checking...' : 'Check Today'}
+          </button>
+        </div>
+
+        {birthdayMsg && (
+          <div style={{
+            background: birthdayMsg.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : birthdayMsg.type === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+            border: `1px solid ${birthdayMsg.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : birthdayMsg.type === 'error' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(59, 130, 246, 0.4)'}`,
+            borderRadius: 'var(--radius-sm)',
+            padding: '12px 16px',
+            marginBottom: '16px',
+            fontSize: '0.86rem',
+            color: birthdayMsg.type === 'success' ? '#34d399' : birthdayMsg.type === 'error' ? '#fca5a5' : '#93c5fd',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            {birthdayMsg.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+            <span>{birthdayMsg.text}</span>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+          {/* Today's Celebrants */}
+          <div style={{ background: 'var(--bg-surface-subtle)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Cake size={15} color="var(--accent-gold)" /> Today's Birthdays ({birthdayPreview?.date || 'WAT'})
+              </strong>
+              <span className="badge badge-teal">{birthdayPreview ? birthdayPreview.birthdayMembers.length : 0}</span>
+            </div>
+
+            {!birthdayPreview || birthdayPreview.birthdayMembers.length === 0 ? (
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
+                No member birthdays matched today.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {birthdayPreview.birthdayMembers.map((m) => (
+                  <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '8px', background: 'var(--bg-surface-raised)', border: '1px solid var(--glass-border)' }}>
+                    <div>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>{m.fullName}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.occupation} • {m.dob}</div>
+                    </div>
+                    {m.whatsappPhone && (
+                      <a
+                        href={`https://wa.me/${m.whatsappPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Happy Birthday Bro ${m.firstName}! Wishing you God's abundant blessings from LICC Men's Fellowship.`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-secondary"
+                        style={{ padding: '5px 10px', fontSize: '0.75rem', color: '#25D366', borderColor: 'rgba(37, 211, 102, 0.35)', textDecoration: 'none' }}
+                      >
+                        Wish
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Designated EXCO Recipients */}
+          <div style={{ background: 'var(--bg-surface-subtle)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Bell size={15} color="var(--accent-teal)" /> Alert Recipients (EXCO)
+              </strong>
+              <span className="badge badge-gold">{birthdayPreview ? birthdayPreview.alertExcos.length : 0}</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {(birthdayPreview?.alertExcos || []).map((ex) => (
+                <div key={ex.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '8px 10px', borderRadius: '8px', background: 'var(--bg-surface-raised)', border: '1px solid var(--glass-border)' }}>
+                  <div>
+                    <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>{ex.name}</div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
+                      {ex.role}{ex.email ? ` • ${ex.email}` : ' • No email set'}
+                    </div>
+                  </div>
+                  {ex.hasValidEmail ? (
+                    <span className="badge badge-teal" style={{ fontSize: '0.7rem' }}>Ready</span>
+                  ) : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: 'var(--accent-amber)', fontWeight: 700 }}>
+                      <AlertTriangle size={12} /> Needs Gmail
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => handleRunBirthdayCheck(true)}
+            disabled={runningAlerts}
+            className="btn-secondary"
+          >
+            <CheckCircle2 size={16} /> {runningAlerts ? 'Running...' : (isAdmin ? 'Dry Run Preview' : 'EXCO Login to Preview')}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRunBirthdayCheck(false)}
+            disabled={runningAlerts}
+            className="btn-primary btn-gold"
+          >
+            <Send size={16} /> {runningAlerts ? 'Sending...' : (isAdmin ? 'Send Today Birthday Alerts Now' : 'EXCO Login to Send')}
+          </button>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            Daily automatic Gmail alerts run via Google Apps Script (`setupBirthdayCron`) at 7:00 AM WAT. Add EXCO Gmail addresses in the Google Sheet `Excos` tab.
+          </span>
+        </div>
       </div>
 
       {/* Step-by-Step Setup Guide Accordion */}

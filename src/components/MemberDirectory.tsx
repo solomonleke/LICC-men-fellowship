@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter, MessageSquare, Briefcase, Trash2, ShieldCheck, UserPlus, Table, Grid, Users, Cake } from 'lucide-react';
+import { Search, Filter, MessageSquare, Briefcase, Trash2, ShieldCheck, UserPlus, Table, Grid, Users, Cake, Pencil } from 'lucide-react';
 import { Member, AgeGroup, OCCUPATIONS } from '../types';
 import { useAdmin } from '../context/AdminContext';
 import { isValidMember } from '../utils/dummyData';
@@ -7,6 +7,7 @@ import { isValidMember } from '../utils/dummyData';
 interface MemberDirectoryProps {
   members: Member[];
   loading?: boolean;
+  onEditMember: (member: Member) => void;
   onDeleteMember: (id: string) => void;
   onOpenRegisterModal: () => void;
 }
@@ -14,6 +15,7 @@ interface MemberDirectoryProps {
 export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
   members,
   loading = false,
+  onEditMember,
   onDeleteMember,
   onOpenRegisterModal,
 }) => {
@@ -224,9 +226,7 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
                   <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Age Bracket</th>
                   <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>DOB (Birthday)</th>
                   <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>WhatsApp Connect</th>
-                  {isAdmin && (
-                    <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
-                  )}
+                  <th style={{ padding: '16px 24px', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -255,17 +255,15 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
                       <td style={{ padding: '16px 24px' }}>
                         <div className="skeleton-box" style={{ width: '160px', height: '36px', borderRadius: '8px' }} />
                       </td>
-                      {isAdmin && (
-                        <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                          <div className="skeleton-box" style={{ width: '75px', height: '36px', borderRadius: '8px' }} />
-                        </td>
-                      )}
+                      <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                        <div className="skeleton-box" style={{ width: '75px', height: '36px', borderRadius: '8px' }} />
+                      </td>
                     </tr>
                   ))
                 ) : filteredMembers.length === 0 ? (
                   /* CLEAN EMPTY STATE - NO DUMMY DATA */
                   <tr>
-                    <td colSpan={isAdmin ? 6 : 5} style={{ padding: '56px 24px', textAlign: 'center' }}>
+                    <td colSpan={6} style={{ padding: '56px 24px', textAlign: 'center' }}>
                       <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(20, 184, 166, 0.12)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px', color: 'var(--accent-teal)' }}>
                         <Users size={26} />
                       </div>
@@ -387,23 +385,34 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
                           </a>
                         </td>
 
-                        {/* Actions (EXCO Admin Only) */}
-                        {isAdmin && (
-                          <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                        {/* Actions (Edit Profile with PIN / Remove for EXCO Admin) */}
+                        <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
                             <button
-                              onClick={() => {
-                                if (confirm(`Are you sure you want to remove ${member.firstName} ${member.lastName} from the Excel database?`)) {
-                                  onDeleteMember(member.id);
-                                }
-                              }}
+                              onClick={() => onEditMember(member)}
                               className="btn-secondary"
-                              style={{ padding: '8px 12px', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' }}
-                              title="Remove Record (EXCO Admin Only)"
+                              style={{ padding: '8px 12px', fontSize: '0.84rem' }}
+                              title={isAdmin ? 'Edit Member Record (EXCO Admin)' : 'Edit Your Profile (Requires 4-Digit Edit PIN)'}
                             >
-                              <Trash2 size={16} /> Remove
+                              <Pencil size={15} /> Edit
                             </button>
-                          </td>
-                        )}
+
+                            {isAdmin && (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to remove ${member.firstName} ${member.lastName} from the Excel database?`)) {
+                                    onDeleteMember(member.id);
+                                  }
+                                }}
+                                className="btn-secondary"
+                                style={{ padding: '8px 12px', borderColor: 'rgba(239, 68, 68, 0.3)', color: '#ef4444' }}
+                                title="Remove Record (EXCO Admin Only)"
+                              >
+                                <Trash2 size={16} /> Remove
+                              </button>
+                            )}
+                          </div>
+                        </td>
 
                       </tr>
                     );
@@ -537,6 +546,15 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({
                     >
                       <MessageSquare size={16} /> Connect on WhatsApp
                     </a>
+
+                    <button
+                      onClick={() => onEditMember(member)}
+                      className="btn-secondary"
+                      style={{ padding: '10px 12px' }}
+                      title={isAdmin ? 'Edit Member Record (EXCO Admin)' : 'Edit Your Profile (Requires 4-Digit Edit PIN)'}
+                    >
+                      <Pencil size={15} />
+                    </button>
 
                     {isAdmin && (
                       <button

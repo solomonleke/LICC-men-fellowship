@@ -8,7 +8,8 @@ export const INITIAL_EXCOS: ExcoMember[] = [
     phone: '+2348033333331',
     email: '',
     portfolio: 'Overall Leadership, Fellowship Vision & Spiritual Oversight',
-    order: 1
+    order: 1,
+    birthdayAlert: false
   },
   {
     id: 'EXCO-2',
@@ -17,7 +18,8 @@ export const INITIAL_EXCOS: ExcoMember[] = [
     phone: '+2348033333332',
     email: '',
     portfolio: 'Programs, Strategy & Executive Coordination',
-    order: 2
+    order: 2,
+    birthdayAlert: false
   },
   {
     id: 'EXCO-3',
@@ -26,7 +28,8 @@ export const INITIAL_EXCOS: ExcoMember[] = [
     phone: '+2348033333333',
     email: '',
     portfolio: 'Administration, Documentation, Records & Communications',
-    order: 3
+    order: 3,
+    birthdayAlert: true
   },
   {
     id: 'EXCO-4',
@@ -35,7 +38,8 @@ export const INITIAL_EXCOS: ExcoMember[] = [
     phone: '+2348165413812',
     email: '',
     portfolio: 'Secretariat, Digital Systems & Data Operations',
-    order: 4
+    order: 4,
+    birthdayAlert: true
   },
   {
     id: 'EXCO-5',
@@ -44,7 +48,8 @@ export const INITIAL_EXCOS: ExcoMember[] = [
     phone: '+2348033333335',
     email: '',
     portfolio: 'Welfare, Socials, Fellowship Hospitality & Events Logistics',
-    order: 5
+    order: 5,
+    birthdayAlert: true
   },
   {
     id: 'EXCO-6',
@@ -53,7 +58,8 @@ export const INITIAL_EXCOS: ExcoMember[] = [
     phone: '+2348033333336',
     email: '',
     portfolio: 'Financial Records, Accounts, Dues & Treasury Oversight',
-    order: 6
+    order: 6,
+    birthdayAlert: false
   }
 ];
 

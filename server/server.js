@@ -8,7 +8,9 @@ dotenv.config();
 
 import {
   getAllMembers as getLocalMembers,
+  getRawMemberById as getLocalRawMemberById,
   addMember as addLocalMember,
+  updateMember as updateLocalMember,
   checkPhoneExists as checkLocalPhone,
   deleteMember as deleteLocalMember,
   getAllShowcases as getLocalShowcases,
@@ -29,8 +31,10 @@ import {
   updateGoogleSheetsConfig,
   testConnection as testSheetsConnection,
   getMembersFromSheet,
+  getRawMemberByIdFromSheet,
   checkPhoneInSheet,
   addMemberToSheet,
+  updateMemberInSheet,
   deleteMemberFromSheet,
   getShowcasesFromSheet,
   addShowcaseToSheet,
@@ -41,8 +45,19 @@ import {
   getExcosFromSheet,
   getEventsFromSheet,
   addEventToSheet,
-  deleteEventFromSheet
+  deleteEventFromSheet,
+  triggerBirthdayAlertsInSheet
 } from './googleSheets.js';
+
+import { buildBirthdayAlertPreview } from './birthdayService.js';
+import {
+  isValidEditPinFormat,
+  hashEditPin,
+  verifyEditPin,
+  checkPinRateLimit,
+  recordFailedPinAttempt,
+  clearFailedPinAttempts
+} from './pinSecurity.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -176,7 +191,7 @@ function validatePhone(phone) {
 
 app.get('/api/members/check-phone', async (req, res) => {
   try {
-    const { phone } = req.query;
+    const { phone, excludeId } = req.query;
     if (!phone) {
       return res.status(400).json({ error: 'Phone number parameter required' });
     }
@@ -188,23 +203,24 @@ app.get('/api/members/check-phone', async (req, res) => {
 
     let exists = false;
     const lookupNumber = validation.normalized || String(phone);
+    const exclude = excludeId ? String(excludeId).trim() : null;
     if (isGoogleSheetsActive()) {
       try {
-        exists = await checkPhoneInSheet(lookupNumber);
+        exists = await checkPhoneInSheet(lookupNumber, exclude);
         if (!exists && validation.normalized && validation.normalized.startsWith('+234')) {
-          exists = await checkPhoneInSheet('0' + validation.normalized.slice(4));
+          exists = await checkPhoneInSheet('0' + validation.normalized.slice(4), exclude);
         }
       } catch (err) {
         console.warn('Google Sheets check-phone failed, checking local Excel:', err.message);
-        exists = await checkLocalPhone(lookupNumber);
+        exists = await checkLocalPhone(lookupNumber, exclude);
         if (!exists && validation.normalized && validation.normalized.startsWith('+234')) {
-          exists = await checkLocalPhone('0' + validation.normalized.slice(4));
+          exists = await checkLocalPhone('0' + validation.normalized.slice(4), exclude);
         }
       }
     } else {
-      exists = await checkLocalPhone(lookupNumber);
+      exists = await checkLocalPhone(lookupNumber, exclude);
       if (!exists && validation.normalized && validation.normalized.startsWith('+234')) {
-        exists = await checkLocalPhone('0' + validation.normalized.slice(4));
+        exists = await checkLocalPhone('0' + validation.normalized.slice(4), exclude);
       }
     }
 
@@ -216,10 +232,14 @@ app.get('/api/members/check-phone', async (req, res) => {
 
 app.post('/api/members', async (req, res) => {
   try {
-    const { firstName, lastName, occupation, ageGroup, whatsappPhone, altPhone, dob, dom } = req.body;
+    const { firstName, lastName, occupation, ageGroup, whatsappPhone, altPhone, dob, dom, editPin } = req.body;
     const finalDob = String(dob || dom || '').trim();
     if (!firstName || !lastName || !occupation || !ageGroup || !whatsappPhone || !finalDob) {
       return res.status(400).json({ error: 'Please provide all required fields (First Name, Last Name, Occupation, Age Group, WhatsApp Phone, Date of Birth).' });
+    }
+
+    if (!isValidEditPinFormat(editPin)) {
+      return res.status(400).json({ error: 'Please choose a 4-digit Edit PIN (e.g. 4829) so you can safely update your profile later.' });
     }
 
     const phoneVal = validatePhone(whatsappPhone);
@@ -238,6 +258,7 @@ app.post('/api/members', async (req, res) => {
     }
 
     const memberPayload = {
+      id: `MEM-${Date.now().toString().slice(-6)}`,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       occupation: occupation.trim(),
@@ -245,7 +266,9 @@ app.post('/api/members', async (req, res) => {
       whatsappPhone: finalPhone,
       altPhone: finalAltPhone,
       dob: finalDob,
-      dom: finalDob
+      dom: finalDob,
+      createdAt: new Date().toISOString(),
+      editPinHash: hashEditPin(editPin)
     };
 
     // Always persist to local Excel as guaranteed persistent storage
@@ -257,11 +280,188 @@ app.post('/api/members', async (req, res) => {
       try {
         cloudMember = await addMemberToSheet(memberPayload);
       } catch (sheetErr) {
+        if (String(sheetErr.message || '').includes('Duplicate entry')) {
+          await deleteLocalMember(localMember.id).catch(() => {});
+          return res.status(400).json({ error: sheetErr.message });
+        }
         console.warn('Google Sheets member sync warning (saved locally):', sheetErr.message);
       }
     }
 
     res.status(201).json(cloudMember || localMember);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+async function findRawMemberForAuth(id) {
+  if (isGoogleSheetsActive()) {
+    try {
+      const sheetMember = await getRawMemberByIdFromSheet(id);
+      if (sheetMember) return { member: sheetMember, source: 'sheets' };
+    } catch (err) {
+      console.warn('Google Sheets raw member lookup failed, checking local Excel:', err.message);
+    }
+  }
+  const localMember = await getLocalRawMemberById(id);
+  if (localMember) return { member: localMember, source: 'local' };
+  return null;
+}
+
+app.post('/api/members/:id/verify-pin', async (req, res) => {
+  try {
+    const memberId = String(req.params.id || '').trim();
+    const passcode = req.headers['x-admin-passcode'] || (req.body && req.body.passcode);
+    const isAdminReq = Boolean(passcode && String(passcode).trim() === ADMIN_PASSCODE);
+    if (isAdminReq) {
+      return res.json({ verified: true, mode: 'admin' });
+    }
+
+    const rate = checkPinRateLimit(memberId);
+    if (!rate.allowed) {
+      return res.status(429).json({ error: rate.message });
+    }
+
+    const found = await findRawMemberForAuth(memberId);
+    if (!found) {
+      return res.status(404).json({ error: 'Member profile not found.' });
+    }
+
+    if (!found.member.editPinHash) {
+      return res.status(403).json({
+        error: 'This profile was registered before Edit PINs were enabled. Please ask an EXCO Admin to edit it or assign your 4-digit Edit PIN.',
+        requiresAdmin: true
+      });
+    }
+
+    const pin = req.body && req.body.editPin;
+    if (!isValidEditPinFormat(pin) || !verifyEditPin(pin, found.member.editPinHash)) {
+      const fail = recordFailedPinAttempt(memberId);
+      if (fail.locked) {
+        return res.status(429).json({ error: 'Too many incorrect PIN attempts. Locked for 15 minutes. Ask an EXCO Admin for help.' });
+      }
+      return res.status(401).json({
+        error: `Incorrect 4-digit Edit PIN. ${fail.remainingAttempts} attempt(s) remaining.`
+      });
+    }
+
+    clearFailedPinAttempts(memberId);
+    res.json({ verified: true, mode: 'pin' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/members/:id', async (req, res) => {
+  try {
+    const memberId = String(req.params.id || '').trim();
+    const passcode = req.headers['x-admin-passcode'] || (req.body && req.body.passcode);
+    const isAdminReq = Boolean(passcode && String(passcode).trim() === ADMIN_PASSCODE);
+
+    const found = await findRawMemberForAuth(memberId);
+    if (!found) {
+      return res.status(404).json({ error: 'Member profile not found.' });
+    }
+
+    if (!isAdminReq) {
+      const rate = checkPinRateLimit(memberId);
+      if (!rate.allowed) {
+        return res.status(429).json({ error: rate.message });
+      }
+
+      if (!found.member.editPinHash) {
+        return res.status(403).json({
+          error: 'This profile does not have an Edit PIN yet. Only an EXCO Admin can edit it or assign an initial PIN.',
+          requiresAdmin: true
+        });
+      }
+
+      const editPin = req.body && req.body.editPin;
+      if (!isValidEditPinFormat(editPin) || !verifyEditPin(editPin, found.member.editPinHash)) {
+        const fail = recordFailedPinAttempt(memberId);
+        if (fail.locked) {
+          return res.status(429).json({ error: 'Too many incorrect PIN attempts. Locked for 15 minutes. Ask an EXCO Admin for help.' });
+        }
+        return res.status(401).json({
+          error: `Incorrect 4-digit Edit PIN. ${fail.remainingAttempts} attempt(s) remaining.`
+        });
+      }
+      clearFailedPinAttempts(memberId);
+    }
+
+    const { firstName, lastName, occupation, ageGroup, whatsappPhone, altPhone, dob, dom, newEditPin } = req.body;
+    const finalDob = String(dob || dom || '').trim();
+    if (!firstName || !lastName || !occupation || !ageGroup || !whatsappPhone || !finalDob) {
+      return res.status(400).json({ error: 'Please provide all required fields (First Name, Last Name, Occupation, Age Group, WhatsApp Phone, Date of Birth).' });
+    }
+
+    const phoneVal = validatePhone(whatsappPhone);
+    if (!phoneVal.isValid) {
+      return res.status(400).json({ error: phoneVal.error });
+    }
+    const finalPhone = phoneVal.normalized || whatsappPhone.trim();
+
+    let finalAltPhone = '';
+    if (altPhone && altPhone.trim()) {
+      const altVal = validatePhone(altPhone);
+      if (!altVal.isValid) {
+        return res.status(400).json({ error: `Alternate phone error: ${altVal.error}` });
+      }
+      finalAltPhone = altVal.normalized || altPhone.trim();
+    }
+
+    let nextPinHash = undefined;
+    if (newEditPin !== undefined && String(newEditPin).trim() !== '') {
+      if (!isValidEditPinFormat(newEditPin)) {
+        return res.status(400).json({ error: 'New Edit PIN must be exactly 4 digits.' });
+      }
+      nextPinHash = hashEditPin(newEditPin);
+    }
+
+    const updatePayload = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      occupation: occupation.trim(),
+      ageGroup,
+      whatsappPhone: finalPhone,
+      altPhone: finalAltPhone,
+      dob: finalDob,
+      dom: finalDob,
+      ...(nextPinHash !== undefined ? { editPinHash: nextPinHash } : {})
+    };
+
+    let cloudMember = null;
+    if (isGoogleSheetsActive()) {
+      try {
+        cloudMember = await updateMemberInSheet(memberId, updatePayload);
+      } catch (sheetErr) {
+        if (String(sheetErr.message || '').includes('Unknown action')) {
+          return res.status(409).json({
+            error: 'Your deployed Google Apps Script Web App needs the updated google-apps-script/Code.gs (with "update" action) deployed before cloud profile edits can save.'
+          });
+        }
+        if (String(sheetErr.message || '').includes('Duplicate entry')) {
+          return res.status(400).json({ error: sheetErr.message });
+        }
+        console.warn('Google Sheets member update warning:', sheetErr.message);
+      }
+    }
+
+    let localMember = null;
+    try {
+      localMember = await updateLocalMember(memberId, updatePayload);
+    } catch (localErr) {
+      if (!cloudMember) {
+        return res.status(400).json({ error: localErr.message });
+      }
+      console.warn('Local Excel member update warning:', localErr.message);
+    }
+
+    if (!cloudMember && !localMember) {
+      return res.status(404).json({ error: 'Member profile could not be updated in storage.' });
+    }
+
+    res.json(cloudMember || localMember);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -474,6 +674,162 @@ app.get('/api/excos', async (req, res) => {
   } catch (error) {
     console.error('Excos fetch error:', error);
     res.json(INITIAL_EXCOS);
+  }
+});
+
+// ----------------- BIRTHDAY ALERTS ENDPOINTS -----------------
+
+function maskEmailForPublic(email) {
+  const str = String(email || '').trim();
+  if (!str) return '';
+  const atIndex = str.indexOf('@');
+  if (atIndex <= 1) return '***';
+  const local = str.slice(0, atIndex);
+  const domain = str.slice(atIndex);
+  return `${local.slice(0, 2)}***${domain}`;
+}
+
+async function loadMembersAndExcosForBirthday() {
+  let members = [];
+  let excos = INITIAL_EXCOS;
+  let source = 'Local Excel (.xlsx)';
+
+  if (isGoogleSheetsActive()) {
+    try {
+      const [sheetMembers, sheetExcos] = await Promise.all([
+        getMembersFromSheet(),
+        getExcosFromSheet()
+      ]);
+      if (Array.isArray(sheetMembers)) {
+        members = sheetMembers;
+        source = 'Google Sheets (Live Cloud)';
+      }
+      if (Array.isArray(sheetExcos) && sheetExcos.length > 0) {
+        excos = sheetExcos;
+      }
+    } catch (err) {
+      console.warn('Google Sheets birthday lookup failed, falling back to local Excel:', err.message);
+    }
+  }
+
+  if (members.length === 0) {
+    const localMembers = await getLocalMembers();
+    if (Array.isArray(localMembers) && localMembers.length > 0) {
+      members = localMembers;
+      source = 'Local Excel (.xlsx)';
+    }
+  }
+
+  if (excos === INITIAL_EXCOS && !isGoogleSheetsActive()) {
+    try {
+      const localExcos = await getLocalExcos();
+      if (Array.isArray(localExcos) && localExcos.length > 0) {
+        excos = localExcos;
+      }
+    } catch (e) {
+      // fall back to INITIAL_EXCOS
+    }
+  }
+
+  return { members, excos, source };
+}
+
+app.get('/api/birthdays/today', async (req, res) => {
+  try {
+    const passcode = req.headers['x-admin-passcode'] || req.query.passcode;
+    const isAdminReq = Boolean(passcode && String(passcode).trim() === ADMIN_PASSCODE);
+
+    const { members, excos, source } = await loadMembersAndExcosForBirthday();
+    const preview = buildBirthdayAlertPreview(members, excos);
+
+    res.json({
+      date: preview.date,
+      timezone: preview.timezone,
+      source,
+      birthdayMembers: preview.birthdayMembers.map(m => ({
+        id: m.id,
+        firstName: m.firstName,
+        lastName: m.lastName,
+        fullName: m.fullName,
+        occupation: m.occupation,
+        dob: m.dob,
+        whatsappPhone: m.whatsappPhone
+      })),
+      alertExcos: preview.alertExcos.map(ex => ({
+        id: ex.id,
+        role: ex.role,
+        name: ex.name,
+        email: isAdminReq ? ex.email : maskEmailForPublic(ex.email),
+        hasValidEmail: ex.hasValidEmail,
+        status: ex.status
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/birthdays/run', requireAdmin, async (req, res) => {
+  try {
+    const dryRun = Boolean(req.body && req.body.dryRun);
+    const force = Boolean(req.body && req.body.force);
+
+    if (isGoogleSheetsActive()) {
+      try {
+        const result = await triggerBirthdayAlertsInSheet({ dryRun, force });
+        return res.json(result);
+      } catch (sheetErr) {
+        if (String(sheetErr.message || '').includes('Unknown action')) {
+          if (dryRun) {
+            const { members, excos } = await loadMembersAndExcosForBirthday();
+            const preview = buildBirthdayAlertPreview(members, excos);
+            return res.json({
+              ...preview,
+              dryRun: true,
+              counts: {
+                celebrants: preview.birthdayMembers.length,
+                recipientsConfigured: preview.alertExcos.length,
+                sent: 0,
+                skippedAlreadySent: 0,
+                skippedMissingEmail: 0,
+                failed: 0
+              },
+              results: [],
+              warning: 'Apps Script Web App needs the updated google-apps-script/Code.gs deployed to send live Gmail alerts.'
+            });
+          }
+          return res.status(409).json({
+            error: 'Your deployed Google Apps Script Web App has not been updated yet. Copy google-apps-script/Code.gs into Apps Script and deploy a new version.'
+          });
+        }
+        throw sheetErr;
+      }
+    }
+
+    const { members, excos } = await loadMembersAndExcosForBirthday();
+    const preview = buildBirthdayAlertPreview(members, excos);
+    if (!dryRun) {
+      return res.status(400).json({
+        error: 'Live Gmail birthday alerts require Google Sheets Apps Script to be connected and deployed.',
+        preview
+      });
+    }
+
+    res.json({
+      ...preview,
+      dryRun: true,
+      counts: {
+        celebrants: preview.birthdayMembers.length,
+        recipientsConfigured: preview.alertExcos.length,
+        sent: 0,
+        skippedAlreadySent: 0,
+        skippedMissingEmail: 0,
+        failed: 0
+      },
+      results: []
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

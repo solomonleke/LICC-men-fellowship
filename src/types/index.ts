@@ -52,6 +52,7 @@ export interface Member {
   dob: string;           // Date of Birth (Month & Day, e.g. "14 Oct") - Compulsory
   dom?: string;          // Optional Date of Marriage legacy fallback
   createdAt: string;
+  hasEditPin?: boolean;  // True when member has a 4-digit Edit PIN configured
 }
 
 export interface ShowcasePost {
@@ -105,6 +106,34 @@ export interface ExcoMember {
   email?: string;
   portfolio: string;
   order: number;
+  birthdayAlert?: boolean | string;
+}
+
+export interface BirthdayCelebrantSummary {
+  id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  occupation: string;
+  dob: string;
+  whatsappPhone?: string;
+}
+
+export interface BirthdayAlertExcoSummary {
+  id: string;
+  role: string;
+  name: string;
+  email?: string;
+  hasValidEmail: boolean;
+  status: 'READY' | 'NEEDS_EMAIL' | string;
+}
+
+export interface TodayBirthdaysResponse {
+  date: string;
+  timezone: string;
+  source: string;
+  birthdayMembers: BirthdayCelebrantSummary[];
+  alertExcos: BirthdayAlertExcoSummary[];
 }
 
 export interface FellowshipEvent {

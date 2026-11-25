@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Shield, Award, Phone, CheckCircle2, UserCheck, KeyRound, MessageCircle } from 'lucide-react';
+import { Shield, Award, Phone, CheckCircle2, UserCheck, KeyRound, MessageCircle, Cake } from 'lucide-react';
 import { ExcoMember } from '../types';
 import { fetchExcos } from '../services/api';
 import { useAdmin } from '../context/AdminContext';
@@ -269,13 +269,41 @@ export function ExcoMembers() {
                   </h3>
                   <div
                     style={{
-                      fontSize: '0.82rem',
-                      fontWeight: 700,
-                      color: 'var(--accent-teal)',
-                      marginBottom: '10px'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '10px',
+                      flexWrap: 'wrap'
                     }}
                   >
-                    {exco.role}
+                    <span
+                      style={{
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        color: 'var(--accent-teal)'
+                      }}
+                    >
+                      {exco.role}
+                    </span>
+                    {Boolean(exco.birthdayAlert) && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          background: 'rgba(245, 158, 11, 0.14)',
+                          border: '1px solid rgba(245, 158, 11, 0.35)',
+                          color: 'var(--accent-gold)',
+                          fontSize: '0.7rem',
+                          fontWeight: 700
+                        }}
+                        title="Receives daily 7:00 AM WAT Gmail birthday alerts"
+                      >
+                        <Cake size={11} /> Birthday Alerts
+                      </span>
+                    )}
                   </div>
                   <p
                     style={{
